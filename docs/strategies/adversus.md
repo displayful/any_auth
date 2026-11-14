@@ -16,7 +16,7 @@ config.provider :adversus
 | `password` | its password |
 
 Both are required. Show them with a form as in
-[the README](../../README.md#fields), with `password_field` for the
+[the README](../../README.md#ask-for-the-fields), with `password_field` for the
 password.
 
 ## Checking what was typed

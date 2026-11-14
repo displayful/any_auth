@@ -17,7 +17,7 @@ config.provider "e-conomic", strategy: :economic
 | `app_token` | your app's secret token |
 
 Both are required. Show them with a form as in
-[the README](../../README.md#fields), and use `password_field`: they
+[the README](../../README.md#ask-for-the-fields), and use `password_field`: they
 are secrets.
 
 ## Checking what was typed

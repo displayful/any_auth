@@ -40,111 +40,147 @@ AnyAuth.configure do |config|
 end
 ```
 
-### 3. Add two routes
+### 3. Add the routes
 
 ```ruby
 # config/routes.rb
-post "auth/:provider",          to: "auth#create",   as: :auth
-get  "auth/:provider/callback", to: "auth#callback", as: :auth_callback
+scope "auth/:provider", module: :auth, as: :auth do
+  resource :authorization, only: :create
+  resource :callback, only: :show
+end
 ```
 
-### 4. Write the controller
+Two resources: `POST /auth/google/authorization` starts the sign-in, and
+`GET /auth/google/callback` is where the vendor sends the person back.
+
+### 4. Write the controllers
+
+The examples build on the Rails 8 authentication generator
+(`bin/rails generate authentication`), which gives you `start_new_session_for`
+and `after_authentication_url`.
 
 ```ruby
-class AuthController < ApplicationController
+# app/controllers/auth/base_controller.rb
+class Auth::BaseController < ApplicationController
   include AnyAuth::ControllerHelpers
 
-  SIGN_IN = %w[google microsoft]
-
+  allow_unauthenticated_access
   before_action :set_strategy
   rescue_from AnyAuth::Error, with: :refused
 
+  private
+    def set_strategy
+      if Identity.provider?(params[:provider])
+        @strategy = AnyAuth.strategy(params[:provider])
+      else
+        head :not_found
+      end
+    end
+
+    def refused
+      redirect_to new_session_path, alert: "Try another way to sign in."
+    end
+end
+```
+
+```ruby
+# app/controllers/auth/authorizations_controller.rb
+class Auth::AuthorizationsController < Auth::BaseController
   def create
     redirect_to_provider @strategy, redirect_uri: auth_callback_url(params[:provider])
   end
+end
+```
 
-  def callback
-    auth = authenticate_with_provider(@strategy)
-    user = User.from_any_auth(auth)
-    return refused unless user
-
-    reset_session
-    session[:user_id] = user.id
-    redirect_to root_path
-  end
-
-  private
-
-  def set_strategy
-    return head :not_found unless params[:provider].in?(SIGN_IN)
-
-    @strategy = AnyAuth.strategy(params[:provider])
-  end
-
-  def refused
-    redirect_to sign_in_path, alert: "We could not sign you in. Try another way."
+```ruby
+# app/controllers/auth/callbacks_controller.rb
+class Auth::CallbacksController < Auth::BaseController
+  def show
+    if user = User.from_any_auth(authenticate_with_provider(@strategy))
+      start_new_session_for user
+      redirect_to after_authentication_url
+    else
+      refused
+    end
   end
 end
 ```
 
 `redirect_to_provider` keeps what the callback needs in the session and sends
 the person to the vendor. `authenticate_with_provider` checks the callback,
-swaps the code for tokens, asks who signed in and returns an `auth`. An
-unknown provider is a 404 because the controller says which providers sign
-people in; `AnyAuth.strategy` raises `KeyError` for a name nobody configured.
+swaps the code for tokens, asks who signed in and returns an `auth`. A failed
+or refused sign-in raises an `AnyAuth::Error`, and the person lands back on
+the sign-in page.
+
+`after_authentication_url` already returns people to the page they were
+asked to sign in on: the generator keeps it in the session, and the trip to
+the vendor leaves it there.
 
 ### 5. Find the person
 
 ```ruby
+# app/models/identity.rb
+class Identity < ApplicationRecord
+  PROVIDERS = %w[ google microsoft ]
+
+  belongs_to :user
+
+  def self.provider?(name)
+    name.in?(PROVIDERS)
+  end
+end
+```
+
+```ruby
+# app/models/user.rb
 class User < ApplicationRecord
-  has_many :identities
+  has_many :sessions, dependent: :destroy
+  has_many :identities, dependent: :destroy
 
   def self.from_any_auth(auth)
-    identity = Identity.find_by(provider: auth.provider, uid: auth.uid)
-    return identity.user if identity
-    return unless auth.info.email_verified
-
-    find_by(email: auth.info.email)&.tap do |user|
-      user.identities.create!(provider: auth.provider, uid: auth.uid)
+    if identity = Identity.find_by(provider: auth.provider, uid: auth.uid)
+      identity.user
+    elsif auth.info.email_verified
+      find_by(email_address: auth.info.email)&.tap do |user|
+        user.identities.create!(provider: auth.provider, uid: auth.uid)
+      end
     end
   end
 end
 ```
 
-Key a person on `provider` and `uid`. Link to an existing account by email only
-when `auth.info.email_verified` is true: AnyAuth sets it only when the vendor
-can vouch for the mailbox, which is stricter than the vendor's own flag (see
-[Google](docs/strategies/google.md) and [Microsoft](docs/strategies/microsoft.md)).
+`Identity::PROVIDERS` is the list of providers people sign in with; any other
+name is a 404, so a provider configured for an API (below) cannot be used to
+sign in. Key a person on `provider` and `uid`. Link to an existing account by
+email only when `auth.info.email_verified` is true: AnyAuth sets it only when
+the vendor can vouch for the mailbox, which is stricter than the vendor's own
+flag (see [Google](docs/strategies/google.md) and
+[Microsoft](docs/strategies/microsoft.md)).
 
 ### 6. Add the buttons
 
 ```erb
-<%= button_to "Sign in with Google", auth_path(:google), form: { data: { turbo: false } } %>
-<%= button_to "Sign in with Microsoft", auth_path(:microsoft), form: { data: { turbo: false } } %>
+<%= button_to "Sign in with Google", auth_authorization_path(:google), form: { data: { turbo: false } } %>
+<%= button_to "Sign in with Microsoft", auth_authorization_path(:microsoft), form: { data: { turbo: false } } %>
 ```
 
 The sign-in starts with a `POST`, and not through Turbo: the browser has to
 follow the redirect to the vendor itself.
 
-### Coming back to where they were
+### Carrying something through the sign-in
 
-Anything passed as `params:` comes back on the `auth`:
+Anything passed as `params:` comes back on the `auth`, such as an invitation
+the person was accepting:
 
 ```ruby
-def create
-  redirect_to_provider @strategy, redirect_uri: auth_callback_url(params[:provider]),
-    params: { return_to: params[:return_to] }
-end
+redirect_to_provider @strategy, redirect_uri: auth_callback_url(params[:provider]),
+  params: { invitation: params[:invitation] }
 
-def callback
-  auth = authenticate_with_provider(@strategy)
-  # …
-  redirect_to url_from(auth.params["return_to"]) || root_path
-end
+auth = authenticate_with_provider(@strategy)
+auth.params["invitation"]
 ```
 
-`params:` goes through the session as JSON, so its keys come back as strings.
-`url_from` keeps the redirect on your own host.
+It goes through the session as JSON, so its keys come back as strings.
 
 ## Connect to a vendor's API
 
@@ -175,6 +211,15 @@ AnyAuth.strategy_class(:shopify).attribute_names   # => ["shop"]
 ```
 
 ```ruby
+# config/routes.rb
+resources :shops, only: %i[ index new create ]
+namespace :shops do
+  resource :callback, only: :show
+end
+```
+
+```ruby
+# app/controllers/shops_controller.rb
 class ShopsController < ApplicationController
   include AnyAuth::ControllerHelpers
 
@@ -183,21 +228,28 @@ class ShopsController < ApplicationController
   end
 
   def create
-    @strategy = AnyAuth.strategy(:shopify, params.expect(strategy: [:shop]))
+    @strategy = AnyAuth.strategy(:shopify, params.expect(strategy: [ :shop ]))
 
     if @strategy.valid?
-      redirect_to_provider @strategy, redirect_uri: callback_shops_url
+      redirect_to_provider @strategy, redirect_uri: shops_callback_url
     else
       render :new, status: :unprocessable_content
     end
   end
+end
+```
 
-  def callback
+```ruby
+# app/controllers/shops/callbacks_controller.rb
+class Shops::CallbacksController < ApplicationController
+  include AnyAuth::ControllerHelpers
+
+  def show
     shopify = AnyAuth.strategy(:shopify)
     auth = authenticate_with_provider(shopify)
 
-    Current.account.shops.create!(credentials: shopify.attributes.merge(auth.credentials))
-    redirect_to shops_path
+    Current.user.shops.create!(credentials: shopify.attributes.merge(auth.credentials))
+    redirect_to shops_path, notice: "#{shopify.shop} is connected."
   end
 end
 ```
@@ -223,10 +275,9 @@ class Shop < ApplicationRecord
   end
 
   private
-
-  def strategy
-    AnyAuth.strategy(:shopify, shop: credentials["shop"])
-  end
+    def strategy
+      AnyAuth.strategy(:shopify, shop: credentials["shop"])
+    end
 end
 ```
 
@@ -381,7 +432,7 @@ checked along the way.
 Stub the vendor's HTTP answers and drive your controllers:
 
 ```ruby
-post auth_path(:google)
+post auth_authorization_path(:google)
 sent = Rack::Utils.parse_query(URI(response.location).query)
 
 claims = { sub: "g-1", email: "mette@gmail.com", email_verified: true, iss: "https://accounts.google.com",

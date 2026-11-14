@@ -37,19 +37,33 @@ so nothing can be checked there. Accept the `POST` and send it on to your
 `GET` callback, which then works as for any other strategy:
 
 ```ruby
-post "auth/apple/callback", to: "auth#apple"
-get  "auth/apple/callback", to: "auth#callback", as: :auth_callback
+# config/routes.rb
+scope "auth/:provider", module: :auth, as: :auth do
+  resource :authorization, only: :create
+  resource :callback, only: %i[ show create ]
+end
+```
 
-skip_forgery_protection only: :apple
+```ruby
+# app/controllers/auth/callbacks_controller.rb
+class Auth::CallbacksController < Auth::BaseController
+  skip_forgery_protection only: :create
 
-def apple
-  redirect_to auth_callback_url(request.request_parameters.slice("code", "state", "user", "error")),
-    status: :see_other
+  def create
+    answer = request.request_parameters.slice("code", "state", "user", "error")
+    redirect_to auth_callback_url(params[:provider], answer), status: :see_other
+  end
+
+  def show
+    # as for every provider
+  end
 end
 ```
 
 Skipping forgery protection is safe for that one action: it changes nothing,
-and the state is still checked against the session on the `GET`.
+and the state is still checked against the session on the `GET`. The routes
+and controllers are the ones in the [README](../../README.md#3-add-the-routes);
+add `apple` to the providers people sign in with.
 
 ## What comes back
 

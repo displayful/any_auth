@@ -26,23 +26,33 @@ should not exist.
 
 ## Using it
 
-It goes through the same two calls as every other strategy, so a controller
-needs no special case. Ask for the email with a form for the strategy, as for
-[any strategy with fields](../../README.md#fields):
+It goes through the same two calls as every other strategy, so the
+[README's controllers](../../README.md#4-write-the-controllers) need one
+change: ask for the fields before leaving, as for
+[any strategy with fields](../../README.md#ask-for-the-fields).
 
 ```ruby
-def create
-  developer = AnyAuth.strategy(:developer, params.expect(strategy: [:email]))
+# config/routes.rb, inside the auth scope
+resource :authorization, only: %i[ new create ]
+```
 
-  if developer.valid?
-    redirect_to_provider developer, redirect_uri: callback_url
-  else
-    render :new, status: :unprocessable_content
+```ruby
+# app/controllers/auth/authorizations_controller.rb
+class Auth::AuthorizationsController < Auth::BaseController
+  def new
   end
-end
 
-def callback
-  auth = authenticate_with_provider(AnyAuth.strategy(:developer))
+  def create
+    if @strategy.class.fields?
+      @strategy.assign_attributes(params.expect(strategy: @strategy.class.attribute_names))
+    end
+
+    if @strategy.valid?
+      redirect_to_provider @strategy, redirect_uri: auth_callback_url(params[:provider])
+    else
+      render :new, status: :unprocessable_content
+    end
+  end
 end
 ```
 

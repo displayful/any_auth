@@ -29,7 +29,7 @@ Leaving raises `ArgumentError` on a shop that is not valid, so a forgotten
 `valid?` cannot send anyone to another host. A callback for such a shop is an
 `InvalidCallback`.
 
-See [the README](../../README.md#fields) for the
+See [the README](../../README.md#ask-for-the-fields) for the
 form and the controller: the shop has to travel with the request, because the
 callback needs the same strategy.
 
