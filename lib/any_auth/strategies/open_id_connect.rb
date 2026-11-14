@@ -26,7 +26,7 @@ module AnyAuth
       end
 
       def for_us?(claims, session)
-        Array(claims['aud']).include?(client_id) && claims['exp'].to_i > Time.now.to_i && session['nonce'].present? &&
+        Array(claims['aud']).include?(client_id) && Time.at(claims['exp'].to_i).future? && session['nonce'].present? &&
           ActiveSupport::SecurityUtils.secure_compare(claims['nonce'].to_s, session['nonce'].to_s)
       end
 

@@ -7,7 +7,9 @@ module AnyAuth
       validates :username, :password, presence: true
 
       def authorization(credentials)
-        { 'Authorization' => "Basic #{[credentials.values_at('username', 'password').join(':')].pack('m0')}" }
+        login = credentials.values_at('username', 'password').join(':')
+
+        { 'Authorization' => "Basic #{Base64.strict_encode64(login)}" }
       end
     end
   end

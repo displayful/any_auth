@@ -15,6 +15,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'activemodel', '>= 8.0'
   spec.add_dependency 'activesupport', '>= 8.0'
+  spec.add_dependency 'base64'
   spec.add_dependency 'faraday', '>= 2.0'
   spec.add_dependency 'jwt', '>= 2.0'
   spec.add_dependency 'oauth2', '>= 2.0'

@@ -33,7 +33,7 @@ module AnyAuth
         assert_equal 'openid email profile', sent['scope']
         assert_equal request.session['state'], sent['state']
         assert_equal request.session['nonce'], sent['nonce']
-        assert_equal Digest::SHA256.base64digest(request.session['code_verifier']).tr('+/', '-_').delete('='),
+        assert_equal Base64.urlsafe_encode64(Digest::SHA256.digest(request.session['code_verifier']), padding: false),
           sent['code_challenge']
       end
 

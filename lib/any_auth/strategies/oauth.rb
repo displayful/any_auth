@@ -29,7 +29,7 @@ module AnyAuth
       end
 
       def expired?(credentials)
-        credentials['expires_at'].present? && Time.parse(credentials['expires_at']).utc <= 2.minutes.from_now
+        credentials['expires_at'].to_s.to_time&.before?(2.minutes.from_now) || false
       end
 
       def fresh(credentials)

@@ -3,7 +3,7 @@ module AnyAuth
     def self.pair
       verifier = SecureRandom.urlsafe_base64(64)
 
-      new(verifier:, challenge: Digest::SHA256.base64digest(verifier).tr('+/', '-_').delete('='))
+      new(verifier:, challenge: Base64.urlsafe_encode64(Digest::SHA256.digest(verifier), padding: false))
     end
   end
 end
