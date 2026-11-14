@@ -8,7 +8,7 @@ class AuthController < ApplicationController
   include AnyAuth::ControllerHelpers
 
   def create
-    redirect_to_any_auth AnyAuth.strategy(:google), redirect_uri: auth_callback_url
+    redirect_to_any_auth_provider AnyAuth.strategy(:google), redirect_uri: auth_callback_url
   end
 
   def callback
@@ -47,7 +47,7 @@ with a `POST` that is not a Turbo submission (`data: { turbo: false }`).
 
 | | |
 | --- | --- |
-| `redirect_to_any_auth(strategy, redirect_uri:, params: {})` | sends the person to the vendor |
+| `redirect_to_any_auth_provider(strategy, redirect_uri:, params: {})` | sends the person to the vendor |
 | `authenticate_with_any_auth(strategy)` | checks the callback, swaps the code, returns the `auth` |
 | `any_auth_params(strategy)` | the `params:` you passed, readable before the code is swapped |
 
@@ -55,7 +55,7 @@ The sign-in is kept in the session for ten minutes and used once. One sign-in
 at a time: a second replaces the first.
 
 ```ruby
-redirect_to_any_auth strategy, redirect_uri: callback_url, params: { return_to: "/boards" }
+redirect_to_any_auth_provider strategy, redirect_uri: callback_url, params: { return_to: "/boards" }
 
 auth = authenticate_with_any_auth(strategy)
 auth.params[:return_to]   # "/boards"
@@ -136,7 +136,7 @@ def create
   @strategy = AnyAuth.strategy(:shopify, params.expect(strategy: [:shop]))
 
   if @strategy.valid?
-    redirect_to_any_auth @strategy, redirect_uri: callback_shops_url
+    redirect_to_any_auth_provider @strategy, redirect_uri: callback_shops_url
   else
     render :new, status: :unprocessable_content
   end

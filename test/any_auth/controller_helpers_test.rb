@@ -15,7 +15,7 @@ module AnyAuth
       def create
         strategy.assign_attributes(params.permit(:email))
 
-        redirect_to_any_auth strategy, redirect_uri: 'https://tavle.test/home', params: { membership_id: 7 }
+        redirect_to_any_auth_provider strategy, redirect_uri: 'https://tavle.test/home', params: { membership_id: 7 }
       end
 
       def show

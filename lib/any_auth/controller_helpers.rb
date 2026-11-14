@@ -2,7 +2,7 @@ module AnyAuth
   module ControllerHelpers
     private
 
-    def redirect_to_any_auth(strategy, redirect_uri:, params: {})
+    def redirect_to_any_auth_provider(strategy, redirect_uri:, params: {})
       auth_request = strategy.request_phase(redirect_uri:)
       session[:any_auth] = {
         provider: strategy.provider,

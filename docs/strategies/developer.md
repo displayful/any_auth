@@ -35,7 +35,7 @@ def create
   developer = AnyAuth.strategy(:developer, params.expect(strategy: [:email]))
 
   if developer.valid?
-    redirect_to_any_auth developer, redirect_uri: callback_url
+    redirect_to_any_auth_provider developer, redirect_uri: callback_url
   else
     render :new, status: :unprocessable_content
   end

@@ -24,7 +24,7 @@ module AnyAuth
         @strategy = strategy(params.expect(strategy: %i[shop]))
 
         if @strategy.valid?
-          redirect_to_any_auth @strategy, redirect_uri: 'https://tavle.test/shops/callback'
+          redirect_to_any_auth_provider @strategy, redirect_uri: 'https://tavle.test/shops/callback'
         else
           render inline: FORM, status: :unprocessable_content
         end
