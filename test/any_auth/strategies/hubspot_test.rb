@@ -5,15 +5,15 @@ require 'test_helper'
 module AnyAuth
   module Strategies
     class HubspotTest < ActiveSupport::TestCase
-      TOKEN_INFO_URL = 'https://api.hubapi.com/oauth/v1/access-tokens/ny'
+      TOKEN_INFO_URL = 'https://api.hubapi.com/oauth/v1/access-tokens/new'
 
       setup do
-        stub_json(:post, 'https://api.hubapi.com/oauth/v1/token', access_token: 'ny')
+        stub_json(:post, 'https://api.hubapi.com/oauth/v1/token', access_token: 'new')
       end
 
       test 'HubSpot names the user who signed in, and says which portal they opened' do
         stub_json(:get, TOKEN_INFO_URL, user_id: 41, user: 'mette@acme.test', hub_id: 8823,
-          token: 'ny')
+          token: 'new')
 
         auth = come_home
 
@@ -45,13 +45,13 @@ module AnyAuth
         refused = assert_raises(Unauthorized) { come_home }
 
         assert_nil refused.cause
-        assert_not_includes refused.message, 'ny'
+        assert_not_includes refused.message, 'new'
       end
 
       private
 
       def come_home
-        hubspot = Hubspot.new(client_id: 'app', client_secret: 'tys')
+        hubspot = Hubspot.new(client_id: 'app', client_secret: 'secret')
 
         hubspot.callback_phase(callback_params, stored_session)
       end

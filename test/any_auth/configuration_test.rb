@@ -7,7 +7,7 @@ module AnyAuth
   class ConfigurationTest < ActiveSupport::TestCase
     setup do
       @config = Configuration.new
-      @config.provider :google, client_id: 'sign-in-app', client_secret: 'tys'
+      @config.provider :google, client_id: 'sign-in-app', client_secret: 'secret'
     end
 
     test 'a provider is built from its entry, and answers to its name' do

@@ -8,18 +8,18 @@ module AnyAuth
       TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token'
 
       setup do
-        stub_json(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/ny', user_id: 41)
+        stub_json(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/new', user_id: 41)
       end
 
       test 'a code is swapped for credentials at the address it was sent back to' do
-        stub_json(:post, TOKEN_URL, access_token: 'ny', refresh_token: 'igen', token_type: 'bearer')
+        stub_json(:post, TOKEN_URL, access_token: 'new', refresh_token: 'refresh')
 
         auth = hubspot.callback_phase(callback_params, stored_session)
 
-        assert_equal({ 'access_token' => 'ny', 'refresh_token' => 'igen' }, auth.credentials)
+        assert_equal({ 'access_token' => 'new', 'refresh_token' => 'refresh' }, auth.credentials)
         assert_requested :post, TOKEN_URL, body: hash_including(
           'grant_type' => 'authorization_code',
-          'code' => 'kode',
+          'code' => 'code',
           'redirect_uri' => CALLBACK_URL
         )
       end
@@ -50,7 +50,7 @@ module AnyAuth
 
         assert_raises(Unauthorized) { hubspot.callback_phase(callback_params, stored_session) }
 
-        stub_json(:post, TOKEN_URL, refresh_token: 'igen')
+        stub_json(:post, TOKEN_URL, refresh_token: 'refresh')
 
         assert_raises(Unauthorized) { hubspot.callback_phase(callback_params, stored_session) }
       end
@@ -68,7 +68,7 @@ module AnyAuth
       test 'a vendor that throttles us is RateLimited' do
         stub_request(:post, TOKEN_URL).to_return(status: 429)
 
-        assert_raises(RateLimited) { hubspot.refresh!('refresh_token' => 'igen') }
+        assert_raises(RateLimited) { hubspot.refresh!('refresh_token' => 'refresh') }
       end
 
       test 'no challenge is sent unless PKCE is switched on' do
@@ -79,8 +79,8 @@ module AnyAuth
       end
 
       test 'with PKCE switched on, leaving sends a challenge and the swap sends its verifier' do
-        stub_json(:post, TOKEN_URL, access_token: 'ny')
-        hubspot = Hubspot.new(client_id: 'app', client_secret: 'tys', pkce: true)
+        stub_json(:post, TOKEN_URL, access_token: 'new')
+        hubspot = Hubspot.new(client_id: 'app', client_secret: 'secret', pkce: true)
         request = hubspot.request_phase(redirect_uri: CALLBACK_URL)
         sent = query_of(request.url)
         verifier = request.session['code_verifier']
@@ -95,7 +95,7 @@ module AnyAuth
       private
 
       def hubspot
-        Hubspot.new(client_id: 'app', client_secret: 'tys')
+        Hubspot.new(client_id: 'app', client_secret: 'secret')
       end
     end
   end

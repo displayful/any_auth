@@ -38,14 +38,14 @@ module AnyAuth
         @strategy ||= STRATEGIES.fetch(params[:provider]).new.tap do |strategy|
           next unless strategy.respond_to?(:client_id=)
 
-          strategy.assign_attributes(client_id: 'app', client_secret: 'tys')
+          strategy.assign_attributes(client_id: 'app', client_secret: 'secret')
         end
       end
     end
 
     setup do
-      stub_json(:post, 'https://api.hubapi.com/oauth/v1/token', access_token: 'ny')
-      stub_json(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/ny', user_id: 41, hub_id: 8823)
+      stub_json(:post, 'https://api.hubapi.com/oauth/v1/token', access_token: 'new')
+      stub_json(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/new', user_id: 41)
     end
 
     test 'leaving and coming home is one call each, and brings back what the app asked to keep' do
@@ -53,9 +53,9 @@ module AnyAuth
 
       assert response.location.start_with?('https://app.hubspot.com/oauth/authorize?')
 
-      get '/hubspot/home', params: { code: 'kode', state: state_sent }
+      get '/hubspot/home', params: { code: 'code', state: state_sent }
 
-      assert_equal({ 'access_token' => 'ny' }, response.parsed_body['credentials'])
+      assert_equal({ 'access_token' => 'new' }, response.parsed_body['credentials'])
       assert_equal({ 'membership_id' => 7 }, response.parsed_body['params'])
     end
 
@@ -63,7 +63,7 @@ module AnyAuth
       post '/hubspot/leave'
       first = state_sent
       post '/relatel/leave'
-      get '/hubspot/home', params: { code: 'kode', state: first }
+      get '/hubspot/home', params: { code: 'code', state: first }
 
       assert_response :unprocessable_content
     end
@@ -73,7 +73,7 @@ module AnyAuth
 
       assert_empty response.parsed_body
 
-      get '/hubspot/home', params: { code: 'kode', state: 'x' }
+      get '/hubspot/home', params: { code: 'code', state: 'x' }
 
       assert_response :unprocessable_content
     end
@@ -81,15 +81,15 @@ module AnyAuth
     test 'coming home a second time is not a sign-in' do
       post '/hubspot/leave'
       state = state_sent
-      get '/hubspot/home', params: { code: 'kode', state: }
-      get '/hubspot/home', params: { code: 'kode', state: }
+      get '/hubspot/home', params: { code: 'code', state: }
+      get '/hubspot/home', params: { code: 'code', state: }
 
       assert_response :unprocessable_content
     end
 
     test 'what one provider kept is no use to another' do
       post '/hubspot/leave'
-      get '/relatel/home', params: { code: 'kode' }
+      get '/relatel/home', params: { code: 'code' }
 
       assert_response :unprocessable_content
     end
@@ -102,7 +102,7 @@ module AnyAuth
       assert_equal({ 'membership_id' => 7 }, response.parsed_body)
       assert_not_requested :post, 'https://api.hubapi.com/oauth/v1/token'
 
-      get '/hubspot/home', params: { code: 'kode', state: }
+      get '/hubspot/home', params: { code: 'code', state: }
 
       assert_response :success
     end
@@ -116,7 +116,7 @@ module AnyAuth
 
         assert_empty response.parsed_body
 
-        get '/hubspot/home', params: { code: 'kode', state: }
+        get '/hubspot/home', params: { code: 'code', state: }
 
         assert_response :unprocessable_content
       end

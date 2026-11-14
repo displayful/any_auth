@@ -8,9 +8,9 @@ module AnyAuth
       TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token'
 
       test 'credentials still good, or that never expire, are answered as they are' do
-        good = { 'access_token' => 'adgang', 'expires_at' => 1.hour.from_now.utc.iso8601 }
-        lasting = { 'access_token' => 'adgang' }
-        pasted = { 'username' => 'api', 'password' => 'hemmeligt' }
+        good = { 'access_token' => 'access', 'expires_at' => 1.hour.from_now.utc.iso8601 }
+        lasting = { 'access_token' => 'access' }
+        pasted = { 'username' => 'api', 'password' => 'password' }
 
         assert_equal good, hubspot.refresh(good)
         assert_equal lasting, hubspot.refresh(lasting)
@@ -19,21 +19,21 @@ module AnyAuth
       end
 
       test 'credentials about to expire are renewed, and keep a refresh token not replaced' do
-        stub_json(:post, TOKEN_URL, access_token: 'nyere', expires_in: 1800)
+        stub_json(:post, TOKEN_URL, access_token: 'newer', expires_in: 1800)
 
         renewed = hubspot.refresh(expiring(1.minute.from_now))
 
-        assert_equal 'nyere', renewed['access_token']
-        assert_equal 'igen', renewed['refresh_token']
+        assert_equal 'newer', renewed['access_token']
+        assert_equal 'refresh', renewed['refresh_token']
         assert_operator Time.iso8601(renewed['expires_at']), :>, 20.minutes.from_now
         assert_requested :post, TOKEN_URL, body: hash_including(
           'grant_type' => 'refresh_token',
-          'refresh_token' => 'igen'
+          'refresh_token' => 'refresh'
         )
       end
 
       test 'a renewal that names no new expiry forgets the old one' do
-        stub_json(:post, TOKEN_URL, access_token: 'nyere')
+        stub_json(:post, TOKEN_URL, access_token: 'newer')
 
         renewed = hubspot.refresh(expiring(1.minute.ago))
 
@@ -57,11 +57,11 @@ module AnyAuth
       private
 
       def hubspot
-        Hubspot.new(client_id: 'app', client_secret: 'tys')
+        Hubspot.new(client_id: 'app', client_secret: 'secret')
       end
 
       def expiring(time)
-        { 'access_token' => 'gammel', 'refresh_token' => 'igen', 'expires_at' => time.utc.iso8601 }
+        { 'access_token' => 'old', 'refresh_token' => 'refresh', 'expires_at' => time.utc.iso8601 }
       end
     end
   end

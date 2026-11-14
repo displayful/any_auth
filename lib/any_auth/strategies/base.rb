@@ -30,7 +30,7 @@ module AnyAuth
 
       private
 
-      def same?(expected, given)
+      def secure_compare(expected, given)
         expected.present? && ActiveSupport::SecurityUtils.secure_compare(expected.to_s, given.to_s)
       end
     end

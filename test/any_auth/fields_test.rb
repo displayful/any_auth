@@ -65,14 +65,15 @@ module AnyAuth
     test 'the fields travel with the request and are stored with the tokens' do
       post '/shops', params: { strategy: { shop: 'mystore' } }
       state = query_of(response.location)['state']
-      answer = { 'code' => 'kode', 'shop' => 'mystore.myshopify.com', 'state' => state }
+      answer = { 'code' => 'code', 'shop' => 'mystore.myshopify.com', 'state' => state }
       hmac = OpenSSL::HMAC.hexdigest('SHA256', 'hush', answer.sort.map { it.join('=') }.join('&'))
-      stub_json(:post, 'https://mystore.myshopify.com/admin/oauth/access_token', access_token: 'ny')
+      stub_json(:post, 'https://mystore.myshopify.com/admin/oauth/access_token',
+        access_token: 'new')
 
       get '/shops/callback', params: answer.merge('hmac' => hmac)
 
       assert_equal 'mystore.myshopify.com', response.parsed_body['shop']
-      assert_equal 'ny', response.parsed_body['access_token']
+      assert_equal 'new', response.parsed_body['access_token']
     end
 
     private

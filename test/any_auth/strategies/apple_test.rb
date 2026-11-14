@@ -81,7 +81,7 @@ module AnyAuth
           exp: 1.hour.from_now.to_i,
           nonce: 'n',
         }.merge(claims)
-        stub_json(:post, "#{APPLE}/auth/token", access_token: 'adgang', id_token: id_token(claims))
+        stub_json(:post, "#{APPLE}/auth/token", access_token: 'access', id_token: id_token(claims))
 
         apple.callback_phase(callback_params(user:).compact, stored_session(nonce: 'n'))
       end

@@ -17,9 +17,9 @@ module AnyAuth
       private
 
       def identity(token, _session)
-        employee = asked_with(token, '/api/v2/employee')['employee']
-        named = employee.is_a?(Hash) && employee['id']
-        raise Unauthorized, 'relatel named no employee for this token' unless named
+        employee = get(token, '/api/v2/employee')['employee']
+        employee = {} unless employee.is_a?(Hash)
+        raise Unauthorized, "#{provider} returned no employee" if employee['id'].blank?
 
         {
           uid: employee['id'].to_s,

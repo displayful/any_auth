@@ -51,13 +51,13 @@ module AnyAuth
       end
 
       test "a callback with Shopify's own signature for the shop is swapped for its tokens" do
-        stub_json(:post, TOKEN_URL, access_token: 'ny', refresh_token: 'igen')
+        stub_json(:post, TOKEN_URL, access_token: 'new', refresh_token: 'refresh')
 
         auth = shop.callback_phase(SIGNED, STORED)
 
         assert_equal 'shopify', auth.provider
         assert_equal 'some-shop.myshopify.com', auth.uid
-        assert_equal({ 'access_token' => 'ny', 'refresh_token' => 'igen' }, auth.credentials)
+        assert_equal({ 'access_token' => 'new', 'refresh_token' => 'refresh' }, auth.credentials)
         assert_requested :post, TOKEN_URL, body: hash_including(
           'code' => SIGNED['code'],
           'expiring' => '1'

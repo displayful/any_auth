@@ -15,8 +15,8 @@ module AnyAuth
       private
 
       def identity(token, _session)
-        token_info = asked_with(token, "/oauth/v1/access-tokens/#{token.token}")
-        raise Unauthorized, 'hubspot named no user for this token' if token_info['user_id'].blank?
+        token_info = get(token, "/oauth/v1/access-tokens/#{token.token}")
+        raise Unauthorized, "#{provider} returned no user" if token_info['user_id'].blank?
 
         {
           uid: token_info['user_id'].to_s,

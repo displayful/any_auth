@@ -22,10 +22,10 @@ module AnyAuth
     end
 
     def strategy(name, attributes = {})
-      strategy_class(name).new(defaults_for(name)).tap do |strategy|
-        strategy.assign_attributes(attributes)
-        strategy.provider = name.to_s
-      end
+      strategy = strategy_class(name).new(defaults_for(name))
+      strategy.assign_attributes(attributes)
+      strategy.provider = name.to_s
+      strategy
     end
 
     private
@@ -41,7 +41,13 @@ module AnyAuth
     end
 
     def defaults_for(name)
-      entry_for(name)[:options].transform_values { it.respond_to?(:call) ? it.call : it }
+      entry_for(name)[:options].transform_values { resolve(it) }
+    end
+
+    def resolve(value)
+      return value.call if value.respond_to?(:call)
+
+      value
     end
   end
 end

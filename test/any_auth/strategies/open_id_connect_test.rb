@@ -53,11 +53,11 @@ module AnyAuth
       end
 
       test 'an answer with no ID token, or one that cannot be read, names nobody' do
-        stub_json(:post, TOKEN_URL, access_token: 'adgang')
+        stub_json(:post, TOKEN_URL, access_token: 'access')
 
         assert_raises(Unauthorized) { come_home }
 
-        stub_json(:post, TOKEN_URL, access_token: 'adgang', id_token: 'not-a-token')
+        stub_json(:post, TOKEN_URL, access_token: 'access', id_token: 'not-a-token')
 
         assert_raises(Unauthorized) { come_home }
       end
@@ -65,7 +65,7 @@ module AnyAuth
       private
 
       def google
-        Google.new(client_id: 'app', client_secret: 'tys')
+        Google.new(client_id: 'app', client_secret: 'secret')
       end
 
       def come_home_with(**claims)
@@ -76,7 +76,7 @@ module AnyAuth
           exp: 1.hour.from_now.to_i,
           nonce: 'n',
         }.merge(claims)
-        stub_json(:post, TOKEN_URL, access_token: 'adgang', id_token: id_token(claims))
+        stub_json(:post, TOKEN_URL, access_token: 'access', id_token: id_token(claims))
 
         come_home
       end

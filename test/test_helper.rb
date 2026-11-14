@@ -19,7 +19,7 @@ module ActiveSupport
     end
 
     def callback_params(**more)
-      { 'code' => 'kode', 'state' => 's' }.merge(more.stringify_keys)
+      { 'code' => 'code', 'state' => 's' }.merge(more.stringify_keys)
     end
 
     def stored_session(**more)

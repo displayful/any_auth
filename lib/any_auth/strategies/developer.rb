@@ -16,10 +16,9 @@ module AnyAuth
       end
 
       def callback_phase(params, session)
-        started = same?(session.to_h['state'], params['state'])
-
-        raise InvalidCallback, 'No developer sign-in is under way' unless started
-        raise InvalidCallback, 'The developer sign-in needs an email' unless valid?
+        state = session.to_h['state']
+        raise InvalidCallback, 'Invalid state' unless secure_compare(state, params['state'])
+        raise InvalidCallback, 'Missing email' unless valid?
 
         address = email.strip.downcase
         info = Info.new(email: address, email_verified: true)

@@ -8,7 +8,7 @@ module AnyAuth
       USERINFO_URL = 'https://tavle.co/oauth/userinfo'
 
       setup do
-        stub_json(:post, 'https://tavle.co/oauth/token', access_token: 'ny')
+        stub_json(:post, 'https://tavle.co/oauth/token', access_token: 'new')
       end
 
       test 'leaving sends a PKCE challenge, which Tavle requires' do
@@ -30,7 +30,7 @@ module AnyAuth
         assert_equal 'mette@acme.test', auth.info.email
         assert_predicate auth.info, :email_verified
         assert_equal 7, auth.raw.dig('company', 'id')
-        assert_requested :get, USERINFO_URL, headers: { 'Authorization' => 'Bearer ny' }
+        assert_requested :get, USERINFO_URL, headers: { 'Authorization' => 'Bearer new' }
       end
 
       test 'a token Tavle names nobody for is Unauthorized' do
@@ -42,7 +42,7 @@ module AnyAuth
       private
 
       def tavle
-        Tavle.new(client_id: 'app', client_secret: 'tys')
+        Tavle.new(client_id: 'app', client_secret: 'secret')
       end
     end
   end

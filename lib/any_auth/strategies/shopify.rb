@@ -7,8 +7,8 @@ module AnyAuth
 
       validates :shop, format: { with: /\A[a-z0-9][a-z0-9-]*\.myshopify\.com\z/, message: :invalid }
 
-      def shop=(typed)
-        super(shop_domain_in(typed))
+      def shop=(value)
+        super(normalize_shop(value))
       end
 
       def client_options
@@ -24,27 +24,31 @@ module AnyAuth
 
       private
 
-      def shop_domain_in(typed)
-        address = typed.to_s.strip.downcase.delete_prefix('https://').delete_prefix('http://')
+      def normalize_shop(value)
+        address = value.to_s.strip.downcase.delete_prefix('https://').delete_prefix('http://')
         name = address[%r{\Aadmin\.shopify\.com/store/([^/]+)}, 1] || address.split('/').first
         return if name.blank?
+        return name if name.include?('.')
 
-        name.include?('.') ? name : "#{name}.myshopify.com"
+        "#{name}.myshopify.com"
       end
 
       def verify(params, session)
         super
-        for_this_shop = shop.present? && params['shop'] == shop
-        signed = signed_by_shopify?(params)
-
-        raise InvalidCallback, 'The callback is for another shop' unless for_this_shop
-        raise InvalidCallback, 'The callback is not signed by Shopify' unless signed
+        raise InvalidCallback, 'Invalid shop' unless shop.present? && params['shop'] == shop
+        raise InvalidCallback, 'Invalid HMAC' unless valid_hmac?(params)
       end
 
-      def signed_by_shopify?(params)
+      def valid_hmac?(params)
         return false unless client_secret.present? && params.values.all?(String)
 
-        same?(signature_of(params), params['hmac'])
+        secure_compare(hmac(params), params['hmac'])
+      end
+
+      def hmac(params)
+        message = params.except('hmac').sort.map { it.join('=') }.join('&')
+
+        OpenSSL::HMAC.hexdigest('SHA256', client_secret, message)
       end
 
       def exchange(code, session)
@@ -53,12 +57,6 @@ module AnyAuth
 
       def identity(token, _session)
         { uid: shop, raw: token.params }
-      end
-
-      def signature_of(params)
-        message = params.except('hmac').sort.map { it.join('=') }.join('&')
-
-        OpenSSL::HMAC.hexdigest('SHA256', client_secret, message)
       end
     end
   end

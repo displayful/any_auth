@@ -34,18 +34,22 @@ module AnyAuth
       end
 
       def expired?(credentials)
-        expires_at = expiry_in(credentials.to_h.stringify_keys)
+        value = credentials.to_h.stringify_keys['expires_at']
+        return false if value.blank?
 
-        expires_at.present? && expires_at.before?(2.minutes.from_now)
+        time = parse_time(value)
+        time.nil? || time.before?(2.minutes.from_now)
       end
 
       def refresh(credentials)
-        expired?(credentials) ? refresh!(credentials) : credentials
+        return credentials unless expired?(credentials)
+
+        refresh!(credentials)
       end
 
       def refresh!(credentials)
         credentials = credentials.to_h.stringify_keys
-        token = asking_the_vendor do
+        token = with_error_handling do
           OAuth2::AccessToken.from_hash(client, credentials).refresh(parse: :json)
         end
 
@@ -58,21 +62,22 @@ module AnyAuth
         authorize_options.index_with { public_send(it) }.compact_blank
       end
 
-      def verify(params, session)
-        started = session['redirect_uri'].present?
-        echoed = same?(session['state'], params['state'])
-
-        raise InvalidCallback, "No sign-in at #{provider} is under way" unless started
-        raise InvalidCallback, "#{provider} did not send back the state we sent" unless echoed
-        raise Declined, params['error'] if params['error'].present?
-        raise InvalidCallback, "#{provider} sent back no code" if params['code'].blank?
-      end
-
       def pkce_params(session)
         pair = PKCE.pair
         session['code_verifier'] = pair.verifier
 
         { code_challenge: pair.challenge, code_challenge_method: 'S256' }
+      end
+
+      def verify(params, session)
+        raise InvalidCallback, 'No sign-in in progress' if session['redirect_uri'].blank?
+        raise InvalidCallback, 'Invalid state' unless valid_state?(params, session)
+        raise Declined, params['error'] if params['error'].present?
+        raise InvalidCallback, 'Missing code' if params['code'].blank?
+      end
+
+      def valid_state?(params, session)
+        secure_compare(session['state'], params['state'])
       end
 
       def exchange(code, session, **params)
@@ -81,22 +86,15 @@ module AnyAuth
           code_verifier: session['code_verifier'],
         )
 
-        asking_the_vendor { client.auth_code.get_token(code, params.compact) }
+        with_error_handling { client.auth_code.get_token(code, params.compact) }
       end
 
       def identity(_token, _session)
         {}
       end
 
-      def asked_with(token, path)
-        answer = asking_the_vendor { token.get(path).parsed }
-        return answer if answer.is_a?(Hash)
-
-        raise Unavailable, "#{provider} answered with something we cannot read"
-      end
-
       def credentials_from(token)
-        raise Unauthorized, "#{provider} sent no access token" if token.token.blank?
+        raise Unauthorized, "#{provider} returned no access token" if token.token.blank?
 
         {
           'access_token' => token.token,
@@ -105,13 +103,13 @@ module AnyAuth
         }.compact
       end
 
-      def expiry_in(credentials)
-        case expires_at = credentials['expires_at']
-        when Numeric then Time.at(expires_at)
-        when String then expires_at.to_time(:utc) || Time.at(0)
+      def parse_time(value)
+        case value
+        when Numeric then Time.at(value)
+        when String then value.to_time(:utc)
         end
       rescue ArgumentError
-        Time.at(0)
+        nil
       end
 
       def client
@@ -121,16 +119,23 @@ module AnyAuth
         end
       end
 
-      def asking_the_vendor
-        yield
-      rescue OAuth2::Error => e
-        raise Unauthorized, "#{provider} refused us (#{e.code || 'no token'})", cause: nil
-      rescue Faraday::Error, JSON::ParserError => e
-        error = error_for(e.try(:response_status))
-        raise error, "#{provider} could not be asked (#{e.class.name.demodulize})", cause: nil
+      def get(token, path)
+        body = with_error_handling { token.get(path).parsed }
+        raise Unavailable, "#{provider} returned an unreadable response" unless body.is_a?(Hash)
+
+        body
       end
 
-      def error_for(status)
+      def with_error_handling
+        yield
+      rescue OAuth2::Error => e
+        raise Unauthorized, "#{provider} returned #{e.code || 'no token'}", cause: nil
+      rescue Faraday::Error, JSON::ParserError => e
+        error_class = error_class_for(e.try(:response_status))
+        raise error_class, "#{provider} request failed (#{e.class.name.demodulize})", cause: nil
+      end
+
+      def error_class_for(status)
         case status
         when 400, 401, 403 then Unauthorized
         when 429 then RateLimited

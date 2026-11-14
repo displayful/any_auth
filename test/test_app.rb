@@ -6,7 +6,7 @@ require 'action_controller/railtie'
 class TestApp < Rails::Application
   config.root = __dir__
   config.eager_load = false
-  config.secret_key_base = 'hemmelig' * 8
+  config.secret_key_base = 'secret' * 8
   config.hosts.clear
   config.logger = Logger.new(nil)
   config.action_controller.allow_forgery_protection = false

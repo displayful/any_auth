@@ -51,8 +51,8 @@ module AnyAuth
           exp: 1.hour.from_now.to_i,
           nonce: 'n',
         }.merge(claims)
-        stub_json(:post, TOKEN_URL, access_token: 'adgang', id_token: id_token(claims))
-        google = Google.new(client_id: 'app', client_secret: 'tys')
+        stub_json(:post, TOKEN_URL, access_token: 'access', id_token: id_token(claims))
+        google = Google.new(client_id: 'app', client_secret: 'secret')
 
         google.callback_phase(callback_params, stored_session(nonce: 'n'))
       end

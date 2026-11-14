@@ -17,8 +17,8 @@ module AnyAuth
       private
 
       def identity(token, _session)
-        userinfo = asked_with(token, '/oauth/userinfo')
-        raise Unauthorized, 'tavle named nobody for this token' if userinfo['sub'].blank?
+        userinfo = get(token, '/oauth/userinfo')
+        raise Unauthorized, "#{provider} returned no subject" if userinfo['sub'].blank?
 
         { uid: userinfo['sub'].to_s, info: info_from(userinfo), raw: userinfo }
       end

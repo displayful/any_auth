@@ -17,14 +17,17 @@ module AnyAuth
       private
 
       def identity_from(claims)
-        issued = issued_by_its_tenant?(claims)
-        raise Unauthorized, 'The ID token was not issued by a Microsoft tenant' unless issued
+        raise Unauthorized, 'Invalid issuer' unless issued_by_its_tenant?(claims)
 
-        { uid: "#{claims['tid']}:#{required(claims, 'oid')}", info: info_from(claims) }
+        { uid: "#{claims['tid']}:#{fetch_claim(claims, 'oid')}", info: info_from(claims) }
       end
 
       def info_from(claims)
-        Info.new(name: claims['name'], email: claims['email'], email_verified: vouched_for?(claims))
+        Info.new(
+          name: claims['name'],
+          email: claims['email'],
+          email_verified: email_verified?(claims),
+        )
       end
 
       def issued_by_its_tenant?(claims)
@@ -34,7 +37,7 @@ module AnyAuth
           claims['iss'] == "https://login.microsoftonline.com/#{tenant}/v2.0"
       end
 
-      def vouched_for?(claims)
+      def email_verified?(claims)
         !personal_account?(claims) && claims['xms_edov'].to_s.in?(%w[true 1])
       end
 
