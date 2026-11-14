@@ -6,11 +6,10 @@ module AnyAuth
       @entries = {}
     end
 
-    def provider(name, strategy: nil, from: nil, **options)
-      inherited = from ? entry_for(from) : { options: {} }
-      strategy_class = class_named(strategy || inherited[:strategy_class] || name)
+    def provider(name, from: nil, strategy: from ? strategy_class(from) : name, **options)
+      options = entry_for(from)[:options].merge(options) if from
 
-      @entries[name.to_s] = { strategy_class:, options: inherited[:options].merge(options) }
+      @entries[name.to_s] = { strategy_class: class_named(strategy), options: }
     end
 
     def providers
