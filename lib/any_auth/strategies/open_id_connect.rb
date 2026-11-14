@@ -18,7 +18,8 @@ module AnyAuth
 
       def identity(token, session)
         claims = claims_in(token)
-        raise Unauthorized, "The ID token from #{provider} is not for this sign-in" unless for_us?(claims, session)
+        ours = for_us?(claims, session)
+        raise Unauthorized, "The ID token from #{provider} is not for this sign-in" unless ours
 
         identity_from(claims).merge(raw: claims)
       end
@@ -38,9 +39,10 @@ module AnyAuth
 
       def issued_to_us?(claims)
         audiences = Array(claims['aud'])
+        party = claims['azp']
 
-        client_id.present? && audiences.include?(client_id) && claims['azp'].in?([nil, client_id]) &&
-          (audiences.one? || claims['azp'] == client_id)
+        client_id.present? && audiences.include?(client_id) && party.in?([nil, client_id]) &&
+          (audiences.one? || party == client_id)
       end
 
       def unexpired?(claims)

@@ -1,6 +1,8 @@
 module AnyAuth
   module Strategies
     class Apple < OpenIDConnect
+      self.pkce = false
+
       attr_accessor :team_id, :key_id, :private_key
 
       def request_phase(redirect_uri:, scope: self.scope || 'email name', **params)
@@ -37,12 +39,17 @@ module AnyAuth
       private
 
       def identity_from(claims)
-        raise Unauthorized, 'The ID token was not issued by Apple' unless claims['iss'] == 'https://appleid.apple.com'
+        raise Unauthorized, 'The ID token was not issued by Apple' unless issued_by_apple?(claims)
 
-        {
-          uid: required(claims, 'sub'),
-          info: Info.new(email: claims['email'], email_verified: claims['email_verified'].to_s == 'true'),
-        }
+        { uid: required(claims, 'sub'), info: info_from(claims) }
+      end
+
+      def issued_by_apple?(claims)
+        claims['iss'] == 'https://appleid.apple.com'
+      end
+
+      def info_from(claims)
+        Info.new(email: claims['email'], email_verified: claims['email_verified'].to_s == 'true')
       end
 
       def name_in(user)

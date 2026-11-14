@@ -10,13 +10,19 @@ module AnyAuth
         'timestamp' => '1337178173',
         'hmac' => '700e2dadb827fcc8609e9d5ce208b2e9cdaab9df07390d2cbca10d7c328fc4bf',
       }.freeze
-      HELD = { 'state' => '0.6784241404160823', 'redirect_uri' => 'https://tavle.test/callback' }.freeze
+      STORED = { 'state' => '0.6784241404160823', 'redirect_uri' => CALLBACK_URL }.freeze
+      TOKEN_URL = 'https://some-shop.myshopify.com/admin/oauth/access_token'.freeze
 
       test 'a shop is the myshopify.com address, however it is typed' do
-        ['mystore', 'MyStore.myshopify.com', 'https://mystore.myshopify.com//', 'mystore.myshopify.com/admin',
-         'https://admin.shopify.com/store/mystore/orders'].each do |typed|
-          assert_equal 'mystore.myshopify.com', Shopify.new(shop: typed).shop
-        end
+        typed = [
+          'mystore',
+          'MyStore.myshopify.com',
+          'https://mystore.myshopify.com//',
+          'mystore.myshopify.com/admin',
+          'https://admin.shopify.com/store/mystore/orders',
+        ]
+
+        typed.each { assert_equal 'mystore.myshopify.com', Shopify.new(shop: it).shop }
       end
 
       test 'an address that is not a shop is an error on the shop' do
@@ -27,47 +33,58 @@ module AnyAuth
       end
 
       test 'a shop that is not a shop is never sent anywhere' do
-        assert_raises(ArgumentError) do
-          Shopify.new(shop: 'evil.test', client_id: 'app').request_phase(redirect_uri: 'https://tavle.test/callback')
-        end
-        assert_raises(ArgumentError) do
-          Shopify.new(client_id: 'app').request_phase(redirect_uri: 'https://tavle.test/callback')
-        end
+        elsewhere = Shopify.new(shop: 'evil.test', client_id: 'app')
+        nowhere = Shopify.new(client_id: 'app')
+
+        assert_raises(ArgumentError) { elsewhere.request_phase(redirect_uri: CALLBACK_URL) }
+        assert_raises(ArgumentError) { nowhere.request_phase(redirect_uri: CALLBACK_URL) }
       end
 
       test 'signing in happens at the shop itself' do
-        request = Shopify.new(shop: 'mystore', client_id: 'app').request_phase(redirect_uri: 'https://tavle.test/callback')
+        shopify = Shopify.new(shop: 'mystore', client_id: 'app')
+
+        request = shopify.request_phase(redirect_uri: CALLBACK_URL)
 
         assert request.url.start_with?('https://mystore.myshopify.com/admin/oauth/authorize?')
       end
 
       test "a callback with Shopify's own signature for the shop is swapped for its tokens" do
-        swap = stub_request(:post, 'https://some-shop.myshopify.com/admin/oauth/access_token')
-               .with(body: hash_including('code' => SIGNED['code'], 'expiring' => '1'))
-               .to_return(headers: { 'Content-Type' => 'application/json' },
-                 body: { access_token: 'ny', refresh_token: 'igen' }.to_json)
+        stub_json(:post, TOKEN_URL, access_token: 'ny', refresh_token: 'igen')
 
-        auth = Shopify.new(shop: 'some-shop', client_secret: 'hush').callback_phase(SIGNED, HELD)
+        auth = shop.callback_phase(SIGNED, STORED)
 
-        assert_requested swap
         assert_equal 'shopify', auth.provider
         assert_equal 'some-shop.myshopify.com', auth.uid
         assert_equal({ 'access_token' => 'ny', 'refresh_token' => 'igen' }, auth.credentials)
+        assert_requested :post, TOKEN_URL, body: hash_including(
+          'code' => SIGNED['code'],
+          'expiring' => '1'
+        )
       end
 
-      test 'a callback changed on the way, for another shop, or with no secret to check it by, is not ours' do
-        ours = Shopify.new(shop: 'some-shop', client_secret: 'hush')
+      test 'a callback changed on the way is not ours' do
+        changed = SIGNED.merge('code' => 'changed')
+        nested = SIGNED.merge('code' => [SIGNED['code']])
 
-        assert_raises(InvalidCallback) { ours.callback_phase(SIGNED.merge('code' => 'changed'), HELD) }
-        assert_raises(InvalidCallback) { ours.callback_phase(SIGNED.merge('code' => [SIGNED['code']]), HELD) }
-        assert_raises(InvalidCallback) do
-          Shopify.new(shop: 'some-shop', client_secret: 'another').callback_phase(SIGNED, HELD)
-        end
-        assert_raises(InvalidCallback) { ours.callback_phase(SIGNED, HELD.merge('state' => 'another')) }
-        assert_raises(InvalidCallback) { Shopify.new(shop: 'some-shop').callback_phase(SIGNED, HELD) }
-        assert_raises(InvalidCallback) do
-          Shopify.new(shop: 'other-shop', client_secret: 'hush').callback_phase(SIGNED, HELD)
-        end
+        assert_raises(InvalidCallback) { shop.callback_phase(changed, STORED) }
+        assert_raises(InvalidCallback) { shop.callback_phase(nested, STORED) }
+        assert_raises(InvalidCallback) { shop.callback_phase(SIGNED, STORED.merge('state' => 'x')) }
+      end
+
+      test 'a callback for another shop, or checked by another secret or none, is not ours' do
+        another_shop = Shopify.new(shop: 'other-shop', client_secret: 'hush')
+        another_secret = Shopify.new(shop: 'some-shop', client_secret: 'another')
+        no_secret = Shopify.new(shop: 'some-shop')
+
+        assert_raises(InvalidCallback) { another_shop.callback_phase(SIGNED, STORED) }
+        assert_raises(InvalidCallback) { another_secret.callback_phase(SIGNED, STORED) }
+        assert_raises(InvalidCallback) { no_secret.callback_phase(SIGNED, STORED) }
+      end
+
+      private
+
+      def shop
+        Shopify.new(shop: 'some-shop', client_secret: 'hush')
       end
     end
   end

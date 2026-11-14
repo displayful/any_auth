@@ -34,7 +34,9 @@ module AnyAuth
       end
 
       def hosted_by_google?(claims)
-        claims['hd'].present? || claims['email'].to_s.downcase.end_with?('@gmail.com', '@googlemail.com')
+        gmail = claims['email'].to_s.downcase.end_with?('@gmail.com', '@googlemail.com')
+
+        gmail || claims['hd'].present?
       end
     end
   end

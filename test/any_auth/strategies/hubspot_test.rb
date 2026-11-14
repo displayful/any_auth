@@ -10,7 +10,8 @@ module AnyAuth
       end
 
       test 'HubSpot names the user who signed in, and says which portal they opened' do
-        stub_json(:get, TOKEN_INFO_URL, user_id: 41, user: 'mette@acme.test', hub_id: 8823, token: 'ny')
+        stub_json(:get, TOKEN_INFO_URL, user_id: 41, user: 'mette@acme.test', hub_id: 8823,
+          token: 'ny')
 
         auth = come_home
 
@@ -28,7 +29,10 @@ module AnyAuth
       end
 
       test 'an answer that cannot be read is Unavailable' do
-        stub_request(:get, TOKEN_INFO_URL).to_return(headers: { 'Content-Type' => 'text/html' }, body: '<html>')
+        stub_request(:get, TOKEN_INFO_URL).to_return(
+          headers: { 'Content-Type' => 'text/html' },
+          body: '<html>'
+        )
 
         assert_raises(Unavailable) { come_home }
       end
@@ -45,8 +49,9 @@ module AnyAuth
       private
 
       def come_home
-        Hubspot.new(client_id: 'app', client_secret: 'tys').callback_phase({ 'code' => 'kode', 'state' => 's' },
-          { 'state' => 's', 'redirect_uri' => 'https://tavle.test/callback' })
+        hubspot = Hubspot.new(client_id: 'app', client_secret: 'tys')
+
+        hubspot.callback_phase(callback_params, stored_session)
       end
     end
   end

@@ -4,19 +4,29 @@ module AnyAuth
   module Strategies
     class AppleTest < ActiveSupport::TestCase
       KEY = OpenSSL::PKey::EC.generate('prime256v1')
+      APPLE = 'https://appleid.apple.com'.freeze
 
       test 'leaving asks for the email and the name, to be posted back' do
-        sent = query_of(apple.request_phase(redirect_uri: 'https://tavle.test/callback').url)
+        sent = query_of(apple.request_phase(redirect_uri: CALLBACK_URL).url)
 
         assert_equal 'openid email name', sent['scope']
         assert_equal 'form_post', sent['response_mode']
       end
 
-      test 'the client secret is signed with our key, names the team and the client, and is short-lived' do
+      test 'leaving sends no PKCE challenge, which Apple does not take' do
+        request = apple.request_phase(redirect_uri: CALLBACK_URL)
+
+        assert_nil query_of(request.url)['code_challenge']
+        assert_equal request.session['nonce'], query_of(request.url)['nonce']
+      end
+
+      test 'the client secret is signed with our key, for our team and client, and short-lived' do
         claims, header = JWT.decode(apple.client_secret, KEY, true, algorithm: 'ES256')
 
         assert_equal 'KEY1234567', header['kid']
-        assert_equal %w[TEAM123456 com.tavle.web https://appleid.apple.com], claims.values_at('iss', 'sub', 'aud')
+        assert_equal 'TEAM123456', claims['iss']
+        assert_equal 'com.tavle.web', claims['sub']
+        assert_equal APPLE, claims['aud']
         assert_operator claims['exp'], :<=, 5.minutes.from_now.to_i
       end
 
@@ -28,7 +38,7 @@ module AnyAuth
         assert_predicate apple.info, :email_verified
       end
 
-      test 'Apple vouches as text or as a boolean, and an address it does not vouch for is not confirmed' do
+      test 'Apple vouches as text or as a boolean, and says so or the address is not confirmed' do
         assert_predicate auth(email: 'mette@icloud.com', email_verified: true).info, :email_verified
         assert_not auth(email: 'mette@icloud.com', email_verified: 'false').info.email_verified
         assert_not auth(email: 'mette@icloud.com').info.email_verified
@@ -53,16 +63,25 @@ module AnyAuth
       private
 
       def apple
-        Apple.new(client_id: 'com.tavle.web', team_id: 'TEAM123456', key_id: 'KEY1234567', private_key: KEY.to_pem)
+        Apple.new(
+          client_id: 'com.tavle.web',
+          team_id: 'TEAM123456',
+          key_id: 'KEY1234567',
+          private_key: KEY.to_pem
+        )
       end
 
       def auth(user: nil, **claims)
-        claims = { sub: 'a-1', iss: 'https://appleid.apple.com', aud: 'com.tavle.web', exp: 1.hour.from_now.to_i,
-                   nonce: 'n' }.merge(claims)
-        stub_json(:post, 'https://appleid.apple.com/auth/token', access_token: 'adgang', id_token: id_token(claims))
+        claims = {
+          sub: 'a-1',
+          iss: APPLE,
+          aud: 'com.tavle.web',
+          exp: 1.hour.from_now.to_i,
+          nonce: 'n',
+        }.merge(claims)
+        stub_json(:post, "#{APPLE}/auth/token", access_token: 'adgang', id_token: id_token(claims))
 
-        apple.callback_phase({ 'code' => 'kode', 'state' => 's', 'user' => user }.compact,
-          { 'state' => 's', 'nonce' => 'n', 'redirect_uri' => 'https://tavle.test/callback' })
+        apple.callback_phase(callback_params(user:).compact, stored_session(nonce: 'n'))
       end
     end
   end

@@ -15,12 +15,14 @@ module AnyAuth
       private
 
       def identity_from(claims)
-        raise Unauthorized, 'The ID token was not issued by a Microsoft tenant' unless issued_by_its_tenant?(claims)
+        issued = issued_by_its_tenant?(claims)
+        raise Unauthorized, 'The ID token was not issued by a Microsoft tenant' unless issued
 
-        {
-          uid: "#{claims['tid']}:#{required(claims, 'oid')}",
-          info: Info.new(name: claims['name'], email: claims['email'], email_verified: vouched_for?(claims)),
-        }
+        { uid: "#{claims['tid']}:#{required(claims, 'oid')}", info: info_from(claims) }
+      end
+
+      def info_from(claims)
+        Info.new(name: claims['name'], email: claims['email'], email_verified: vouched_for?(claims))
       end
 
       def issued_by_its_tenant?(claims)

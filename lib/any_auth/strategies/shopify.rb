@@ -32,12 +32,17 @@ module AnyAuth
 
       def verify(params, session)
         super
-        raise InvalidCallback, 'The callback is for another shop' unless shop.present? && params['shop'] == shop
-        raise InvalidCallback, 'The callback is not signed by Shopify' unless signed_by_shopify?(params)
+        for_this_shop = shop.present? && params['shop'] == shop
+        signed = signed_by_shopify?(params)
+
+        raise InvalidCallback, 'The callback is for another shop' unless for_this_shop
+        raise InvalidCallback, 'The callback is not signed by Shopify' unless signed
       end
 
       def signed_by_shopify?(params)
-        client_secret.present? && params.values.all?(String) && same?(signature_of(params), params['hmac'])
+        return false unless client_secret.present? && params.values.all?(String)
+
+        same?(signature_of(params), params['hmac'])
       end
 
       def exchange(code, session)
@@ -49,7 +54,9 @@ module AnyAuth
       end
 
       def signature_of(params)
-        OpenSSL::HMAC.hexdigest('SHA256', client_secret, params.except('hmac').sort.map { it.join('=') }.join('&'))
+        message = params.except('hmac').sort.map { it.join('=') }.join('&')
+
+        OpenSSL::HMAC.hexdigest('SHA256', client_secret, message)
       end
     end
   end

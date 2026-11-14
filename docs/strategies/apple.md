@@ -73,3 +73,7 @@ Services ID), expiry, the nonce sent with this request, and issuer
 (`https://appleid.apple.com`). A token that fails is an
 `AnyAuth::Unauthorized`. The name in `user` is not signed, so treat it as
 what the person typed.
+
+No PKCE challenge is sent. Apple documents no `code_challenge` on its
+authorize or token endpoints and lists none in its discovery document, so the
+state and the nonce are what tie the callback to this browser.

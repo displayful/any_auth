@@ -24,7 +24,7 @@ module AnyAuth
         @strategy = strategy(params.expect(strategy: %i[shop]))
 
         if @strategy.valid?
-          redirect_to_any_auth_provider @strategy, redirect_uri: 'https://tavle.test/shops/callback'
+          redirect_to_provider @strategy, redirect_uri: 'https://tavle.test/shops/callback'
         else
           render inline: FORM, status: :unprocessable_content
         end
@@ -32,7 +32,7 @@ module AnyAuth
 
       def callback
         shopify = strategy
-        auth = authenticate_with_any_auth(shopify)
+        auth = authenticate_with_provider(shopify)
 
         render json: shopify.attributes.merge(auth.credentials)
       end
@@ -40,7 +40,9 @@ module AnyAuth
       private
 
       def strategy(fields = {})
-        Strategies::Shopify.new(client_id: 'app', client_secret: 'hush').tap { it.assign_attributes(fields) }
+        shopify = Strategies::Shopify.new(client_id: 'app', client_secret: 'hush')
+        shopify.assign_attributes(fields)
+        shopify
       end
     end
 
@@ -60,15 +62,15 @@ module AnyAuth
 
     test 'the fields travel with the request and are stored with the tokens' do
       post '/shops', params: { strategy: { shop: 'mystore' } }
-      sent = Rack::Utils.parse_query(URI(response.location).query)
-      answer = { 'code' => 'kode', 'shop' => 'mystore.myshopify.com', 'state' => sent['state'] }
+      state = query_of(response.location)['state']
+      answer = { 'code' => 'kode', 'shop' => 'mystore.myshopify.com', 'state' => state }
       hmac = OpenSSL::HMAC.hexdigest('SHA256', 'hush', answer.sort.map { it.join('=') }.join('&'))
-      stub_request(:post, 'https://mystore.myshopify.com/admin/oauth/access_token')
-        .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
+      stub_json(:post, 'https://mystore.myshopify.com/admin/oauth/access_token', access_token: 'ny')
 
       get '/shops/callback', params: answer.merge('hmac' => hmac)
 
-      assert_equal({ 'shop' => 'mystore.myshopify.com', 'access_token' => 'ny' }, response.parsed_body)
+      assert_equal 'mystore.myshopify.com', response.parsed_body['shop']
+      assert_equal 'ny', response.parsed_body['access_token']
     end
 
     private

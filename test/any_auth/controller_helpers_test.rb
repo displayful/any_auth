@@ -15,11 +15,13 @@ module AnyAuth
       def create
         strategy.assign_attributes(params.permit(:email))
 
-        redirect_to_any_auth_provider strategy, redirect_uri: 'https://tavle.test/home', params: { membership_id: 7 }
+        redirect_to_provider strategy,
+          redirect_uri: 'https://tavle.test/home',
+          params: { membership_id: 7 }
       end
 
       def show
-        auth = authenticate_with_any_auth(strategy)
+        auth = authenticate_with_provider(strategy)
 
         render json: { uid: auth.uid, credentials: auth.credentials, params: auth.params }
       end
@@ -31,8 +33,10 @@ module AnyAuth
       private
 
       def strategy
-        @strategy ||= STRATEGIES.fetch(params[:provider]).new.tap do
-          it.assign_attributes(client_id: 'app', client_secret: 'tys') if it.respond_to?(:client_id=)
+        @strategy ||= STRATEGIES.fetch(params[:provider]).new.tap do |strategy|
+          next unless strategy.respond_to?(:client_id=)
+
+          strategy.assign_attributes(client_id: 'app', client_secret: 'tys')
         end
       end
     end
@@ -42,7 +46,7 @@ module AnyAuth
       stub_json(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/ny', user_id: 41, hub_id: 8823)
     end
 
-    test 'leaving for a provider and coming home is one call each, with what the app asked to remember' do
+    test 'leaving and coming home is one call each, and brings back what the app asked to keep' do
       post '/hubspot/leave'
 
       assert response.location.start_with?('https://app.hubspot.com/oauth/authorize?')
@@ -119,7 +123,7 @@ module AnyAuth
     test 'the fields a strategy was given come home with it, and never show in the address' do
       post '/developer/leave', params: { email: 'Mette@Acme.test' }
 
-      assert_equal %w[state], Rack::Utils.parse_query(URI(response.location).query).keys
+      assert_equal %w[state], query_of(response.location).keys
 
       get '/developer/home', params: { state: state_sent }
 
@@ -133,7 +137,7 @@ module AnyAuth
     end
 
     def state_sent
-      Rack::Utils.parse_query(URI(response.location).query)['state']
+      query_of(response.location)['state']
     end
   end
 end

@@ -26,7 +26,7 @@ back, and what is unusual about it.
   credentials. `auth.uid` is who signed in; which account that opened is in
   `auth.raw`. They send a PKCE challenge when configured with `pkce: true`.
 - **OpenID Connect** strategies are OAuth 2 plus an answer to who signed in.
-  They always ask for `openid`, send a nonce and a PKCE challenge, and read
+  They always ask for `openid`, send a nonce and (except to Apple) a PKCE challenge, and read
   `auth.uid` and `auth.info` from the ID token.
 - **Fields-only** strategies (e-conomic, Adversus) have no round trip. The person types what the
   vendor gave them, and `strategy.attributes` is what you store.

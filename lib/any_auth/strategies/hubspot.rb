@@ -16,7 +16,11 @@ module AnyAuth
         token_info = asked_with(token, "/oauth/v1/access-tokens/#{token.token}")
         raise Unauthorized, 'hubspot named no user for this token' if token_info['user_id'].blank?
 
-        { uid: token_info['user_id'].to_s, info: Info.new(email: token_info['user']), raw: token_info.except('token') }
+        {
+          uid: token_info['user_id'].to_s,
+          info: Info.new(email: token_info['user']),
+          raw: token_info.except('token'),
+        }
       end
     end
   end

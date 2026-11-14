@@ -33,7 +33,9 @@ module AnyAuth
     end
 
     def class_named(strategy)
-      strategy.is_a?(Class) ? strategy : Strategies.const_get(strategy.to_s.underscore.camelize, false)
+      return strategy if strategy.is_a?(Class)
+
+      Strategies.const_get(strategy.to_s.underscore.camelize, false)
     end
 
     def defaults_for(name)

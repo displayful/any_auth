@@ -4,26 +4,25 @@ module AnyAuth
   module Strategies
     class OpenIDConnectTest < ActiveSupport::TestCase
       TOKEN_URL = 'https://oauth2.googleapis.com/token'.freeze
-      CALLBACK = 'https://tavle.test/callback'.freeze
+      DRIVE = 'https://www.googleapis.com/auth/drive.file'.freeze
 
-      test 'leaving asks who the person is, with a nonce and a challenge only this sign-in can answer' do
-        request = google.request_phase(redirect_uri: CALLBACK)
+      test 'leaving asks who the person is, with a nonce and a challenge of its own' do
+        request = google.request_phase(redirect_uri: CALLBACK_URL)
         sent = query_of(request.url)
 
         assert_equal 'openid email profile', sent['scope']
         assert_equal request.session['nonce'], sent['nonce']
-        assert_equal Base64.urlsafe_encode64(Digest::SHA256.digest(request.session['code_verifier']), padding: false),
-          sent['code_challenge']
+        assert_equal challenge_for(request.session['code_verifier']), sent['code_challenge']
       end
 
       test 'asked for something else, it still asks who the person is' do
-        request = google.request_phase(redirect_uri: CALLBACK, scope: 'https://www.googleapis.com/auth/drive.file')
+        request = google.request_phase(redirect_uri: CALLBACK_URL, scope: DRIVE)
 
-        assert_equal 'openid https://www.googleapis.com/auth/drive.file', query_of(request.url)['scope']
+        assert_equal "openid #{DRIVE}", query_of(request.url)['scope']
       end
 
       test 'what the caller asks for cannot replace the state or the nonce' do
-        request = google.request_phase(redirect_uri: CALLBACK, state: 'mine', nonce: 'mine')
+        request = google.request_phase(redirect_uri: CALLBACK_URL, state: 'mine', nonce: 'mine')
         sent = query_of(request.url)
 
         assert_equal request.session['state'], sent['state']
@@ -35,7 +34,7 @@ module AnyAuth
 
         assert_equal 'g-1', auth.uid
         assert_equal 'app', auth.raw['aud']
-        assert_requested :post, TOKEN_URL, body: hash_including('code' => 'kode', 'code_verifier' => 'v')
+        assert_requested :post, TOKEN_URL, body: hash_including('code_verifier' => 'v')
       end
 
       test 'a token for another sign-in, or that has expired, is refused' do
@@ -68,16 +67,20 @@ module AnyAuth
       end
 
       def come_home_with(**claims)
-        claims = { sub: 'g-1', iss: 'https://accounts.google.com', aud: 'app', exp: 1.hour.from_now.to_i,
-                   nonce: 'n' }.merge(claims)
+        claims = {
+          sub: 'g-1',
+          iss: 'https://accounts.google.com',
+          aud: 'app',
+          exp: 1.hour.from_now.to_i,
+          nonce: 'n',
+        }.merge(claims)
         stub_json(:post, TOKEN_URL, access_token: 'adgang', id_token: id_token(claims))
 
         come_home
       end
 
       def come_home
-        google.callback_phase({ 'code' => 'kode', 'state' => 's' },
-          { 'state' => 's', 'nonce' => 'n', 'code_verifier' => 'v', 'redirect_uri' => CALLBACK })
+        google.callback_phase(callback_params, stored_session(nonce: 'n', code_verifier: 'v'))
       end
     end
   end

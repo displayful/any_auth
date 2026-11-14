@@ -16,7 +16,9 @@ module AnyAuth
       def request_phase(redirect_uri:, **params)
         session = { 'state' => SecureRandom.hex(24), 'redirect_uri' => redirect_uri }
         params = params.merge(pkce_params(session)) if pkce?
-        url = client.auth_code.authorize_url(**authorize_params, **params, redirect_uri:, state: session['state'])
+        url = client.auth_code.authorize_url(
+          **authorize_params, **params, redirect_uri:, state: session['state']
+        )
 
         Request.new(url:, session:)
       end
@@ -41,7 +43,9 @@ module AnyAuth
 
       def refresh!(credentials)
         credentials = credentials.to_h.stringify_keys
-        token = asking_the_vendor { OAuth2::AccessToken.from_hash(client, credentials).refresh(parse: :json) }
+        token = asking_the_vendor do
+          OAuth2::AccessToken.from_hash(client, credentials).refresh(parse: :json)
+        end
 
         credentials.except('expires_at').merge(credentials_from(token))
       end
@@ -53,8 +57,11 @@ module AnyAuth
       end
 
       def verify(params, session)
-        raise InvalidCallback, "No sign-in at #{provider} is under way" if session['redirect_uri'].blank?
-        raise InvalidCallback, "#{provider} did not send back the state we sent" unless same?(session['state'], params['state'])
+        started = session['redirect_uri'].present?
+        echoed = same?(session['state'], params['state'])
+
+        raise InvalidCallback, "No sign-in at #{provider} is under way" unless started
+        raise InvalidCallback, "#{provider} did not send back the state we sent" unless echoed
         raise Declined, params['error'] if params['error'].present?
         raise InvalidCallback, "#{provider} sent back no code" if params['code'].blank?
       end
@@ -67,9 +74,12 @@ module AnyAuth
       end
 
       def exchange(code, session, **params)
-        params = { redirect_uri: session['redirect_uri'], code_verifier: session['code_verifier'], **params }.compact
+        params = params.merge(
+          redirect_uri: session['redirect_uri'],
+          code_verifier: session['code_verifier'],
+        )
 
-        asking_the_vendor { client.auth_code.get_token(code, params) }
+        asking_the_vendor { client.auth_code.get_token(code, params.compact) }
       end
 
       def identity(_token, _session)
@@ -114,8 +124,8 @@ module AnyAuth
       rescue OAuth2::Error => e
         raise Unauthorized, "#{provider} refused us (#{e.code || 'no token'})", cause: nil
       rescue Faraday::Error, JSON::ParserError => e
-        raise error_for(e.try(:response_status)), "#{provider} could not be asked (#{e.class.name.demodulize})",
-          cause: nil
+        error = error_for(e.try(:response_status))
+        raise error, "#{provider} could not be asked (#{e.class.name.demodulize})", cause: nil
       end
 
       def error_for(status)

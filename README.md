@@ -8,11 +8,11 @@ class AuthController < ApplicationController
   include AnyAuth::ControllerHelpers
 
   def create
-    redirect_to_any_auth_provider AnyAuth.strategy(:google), redirect_uri: auth_callback_url
+    redirect_to_provider AnyAuth.strategy(:google), redirect_uri: auth_callback_url
   end
 
   def callback
-    auth = authenticate_with_any_auth(AnyAuth.strategy(:google))
+    auth = authenticate_with_provider(AnyAuth.strategy(:google))
     auth.uid          # "1184…"
     auth.info.email   # "mette@acme.test"
   end
@@ -47,17 +47,17 @@ with a `POST` that is not a Turbo submission (`data: { turbo: false }`).
 
 | | |
 | --- | --- |
-| `redirect_to_any_auth_provider(strategy, redirect_uri:, params: {})` | sends the person to the vendor |
-| `authenticate_with_any_auth(strategy)` | checks the callback, swaps the code, returns the `auth` |
+| `redirect_to_provider(strategy, redirect_uri:, params: {})` | sends the person to the vendor |
+| `authenticate_with_provider(strategy)` | checks the callback, swaps the code, returns the `auth` |
 | `any_auth_params(strategy)` | the `params:` you passed, readable before the code is swapped |
 
 The sign-in is kept in the session for ten minutes and used once. One sign-in
 at a time: a second replaces the first.
 
 ```ruby
-redirect_to_any_auth_provider strategy, redirect_uri: callback_url, params: { return_to: "/boards" }
+redirect_to_provider strategy, redirect_uri: callback_url, params: { return_to: "/boards" }
 
-auth = authenticate_with_any_auth(strategy)
+auth = authenticate_with_provider(strategy)
 auth.params[:return_to]   # "/boards"
 ```
 
@@ -136,7 +136,7 @@ def create
   @strategy = AnyAuth.strategy(:shopify, params.expect(strategy: [:shop]))
 
   if @strategy.valid?
-    redirect_to_any_auth_provider @strategy, redirect_uri: callback_shops_url
+    redirect_to_provider @strategy, redirect_uri: callback_shops_url
   else
     render :new, status: :unprocessable_content
   end
@@ -144,7 +144,7 @@ end
 
 def callback
   shopify = AnyAuth.strategy(:shopify)
-  auth    = authenticate_with_any_auth(shopify)   # puts the shop back on the strategy
+  auth    = authenticate_with_provider(shopify)   # puts the shop back on the strategy
 
   current_account.shops.create!(credentials: shopify.attributes.merge(auth.credentials))
 end
@@ -230,7 +230,7 @@ with `{ uid:, info: }`, checking the issuer there.
 | --- | --- |
 | `provider :google_oauth2, id, secret` | `config.provider :google, client_id:, client_secret:` |
 | `/auth/:provider` and its callback | two routes and actions of your own |
-| `request.env["omniauth.auth"]` | the return value of `authenticate_with_any_auth` |
+| `request.env["omniauth.auth"]` | the return value of `authenticate_with_provider` |
 | `omniauth.params`, `omniauth.origin` | `params:`, read back as `auth.params` |
 | `/auth/failure` | `rescue_from AnyAuth::Error` |
 | a `setup` proc | attributes passed to `AnyAuth.strategy` |
