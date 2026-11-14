@@ -21,7 +21,7 @@ module AnyAuth
 
       test 'Tavle names the member who signed in, and says which company they are in' do
         stub_json(:get, USERINFO_URL, sub: '34', name: 'Mette Holm', email: 'mette@acme.test',
-          email_verified: true, company: { id: 7, name: 'Acme' })
+          email_verified: true, company: { id: 7, name: 'Acme' }, givenName: 'Mette')
 
         auth = tavle.callback_phase(callback_params, stored_session)
 
@@ -30,6 +30,8 @@ module AnyAuth
         assert_equal 'mette@acme.test', auth.info.email
         assert_predicate auth.info, :email_verified
         assert_equal 7, auth.raw.dig('company', 'id')
+        assert_equal 'Mette', auth.raw['givenName']
+        assert_instance_of Hash, auth.raw
         assert_requested :get, USERINFO_URL, headers: { 'Authorization' => 'Bearer new' }
       end
 

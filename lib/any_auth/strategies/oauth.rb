@@ -104,7 +104,7 @@ module AnyAuth
       end
 
       def get(token, path)
-        body = with_error_handling { token.get(path).parsed }
+        body = with_error_handling { token.get(path, snaky: false).parsed }
         raise Unavailable, "#{provider} returned an unreadable response" unless body.is_a?(Hash)
 
         body
