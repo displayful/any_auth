@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 module AnyAuth
   module Strategies
     class HubspotTest < ActiveSupport::TestCase
-      TOKEN_INFO_URL = 'https://api.hubapi.com/oauth/v1/access-tokens/ny'.freeze
+      TOKEN_INFO_URL = 'https://api.hubapi.com/oauth/v1/access-tokens/ny'
 
       setup do
         stub_json(:post, 'https://api.hubapi.com/oauth/v1/token', access_token: 'ny')

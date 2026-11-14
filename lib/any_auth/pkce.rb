@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AnyAuth
   PKCE = Data.define(:verifier, :challenge) do
     def self.pair

@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 module AnyAuth
   module Strategies
     class RelatelTest < ActiveSupport::TestCase
-      EMPLOYEE_URL = 'https://app.relatel.dk/api/v2/employee'.freeze
+      EMPLOYEE_URL = 'https://app.relatel.dk/api/v2/employee'
 
       test 'leaving sends a PKCE challenge, which Relatel takes' do
         relatel = Relatel.new(client_id: 'app', client_secret: 'tys')

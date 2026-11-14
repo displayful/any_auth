@@ -1,11 +1,13 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 module AnyAuth
   module Strategies
     class MicrosoftTest < ActiveSupport::TestCase
-      TENANT = '72f988bf-86f1-41af-91ab-2d7cd011db47'.freeze
-      PERSONAL = '9188040d-6c67-4c5b-b112-36a304b66dad'.freeze
-      TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'.freeze
+      TENANT = '72f988bf-86f1-41af-91ab-2d7cd011db47'
+      PERSONAL = '9188040d-6c67-4c5b-b112-36a304b66dad'
+      TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
 
       test 'a person is their tenant and object id, never their email' do
         assert_equal "#{TENANT}:o-1", auth(oid: 'o-1', email: 'mette@acme.test').uid

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'any_auth'
 require 'active_support/test_case'
 require 'active_support/testing/time_helpers'
@@ -7,7 +9,7 @@ require 'webmock/minitest'
 
 module ActiveSupport
   class TestCase
-    CALLBACK_URL = 'https://tavle.test/callback'.freeze
+    CALLBACK_URL = 'https://tavle.test/callback'
 
     def stub_json(method, url, **body)
       stub_request(method, url).to_return(

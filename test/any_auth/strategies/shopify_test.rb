@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 module AnyAuth
@@ -11,7 +13,7 @@ module AnyAuth
         'hmac' => '700e2dadb827fcc8609e9d5ce208b2e9cdaab9df07390d2cbca10d7c328fc4bf',
       }.freeze
       STORED = { 'state' => '0.6784241404160823', 'redirect_uri' => CALLBACK_URL }.freeze
-      TOKEN_URL = 'https://some-shop.myshopify.com/admin/oauth/access_token'.freeze
+      TOKEN_URL = 'https://some-shop.myshopify.com/admin/oauth/access_token'
 
       test 'a shop is the myshopify.com address, however it is typed' do
         typed = [

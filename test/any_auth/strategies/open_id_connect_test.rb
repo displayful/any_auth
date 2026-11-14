@@ -1,10 +1,12 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 module AnyAuth
   module Strategies
     class OpenIDConnectTest < ActiveSupport::TestCase
-      TOKEN_URL = 'https://oauth2.googleapis.com/token'.freeze
-      DRIVE = 'https://www.googleapis.com/auth/drive.file'.freeze
+      TOKEN_URL = 'https://oauth2.googleapis.com/token'
+      DRIVE = 'https://www.googleapis.com/auth/drive.file'
 
       test 'leaving asks who the person is, with a nonce and a challenge of its own' do
         request = google.request_phase(redirect_uri: CALLBACK_URL)

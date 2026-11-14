@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 module AnyAuth
   module Strategies
     class TavleTest < ActiveSupport::TestCase
-      USERINFO_URL = 'https://tavle.co/oauth/userinfo'.freeze
+      USERINFO_URL = 'https://tavle.co/oauth/userinfo'
 
       setup do
         stub_json(:post, 'https://tavle.co/oauth/token', access_token: 'ny')

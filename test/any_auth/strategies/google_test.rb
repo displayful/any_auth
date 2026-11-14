@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 module AnyAuth
   module Strategies
     class GoogleTest < ActiveSupport::TestCase
-      TOKEN_URL = 'https://oauth2.googleapis.com/token'.freeze
+      TOKEN_URL = 'https://oauth2.googleapis.com/token'
 
       test 'Google names the person, with their picture, and hands over what it said' do
         google = auth(name: 'Mette Holm', picture: 'https://g.test/m.png', hd: 'acme.test')

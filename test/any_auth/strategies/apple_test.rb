@@ -1,10 +1,12 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 module AnyAuth
   module Strategies
     class AppleTest < ActiveSupport::TestCase
       KEY = OpenSSL::PKey::EC.generate('prime256v1')
-      APPLE = 'https://appleid.apple.com'.freeze
+      APPLE = 'https://appleid.apple.com'
 
       test 'leaving asks for the email and the name, to be posted back' do
         sent = query_of(apple.request_phase(redirect_uri: CALLBACK_URL).url)

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AnyAuth
   module Strategies
     class Google < OpenIDConnect

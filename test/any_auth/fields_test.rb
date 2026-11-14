@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 require 'test_app'
 
@@ -6,7 +8,7 @@ module AnyAuth
     class ShopsController < ActionController::Base
       include ControllerHelpers
 
-      FORM = <<~ERB.freeze
+      FORM = <<~ERB
         <%= form_with model: @strategy, scope: :strategy, url: '/shops' do |form| %>
           <%= form.label :shop %>
           <%= form.text_field :shop %>
