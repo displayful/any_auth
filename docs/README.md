@@ -15,6 +15,7 @@ back, and what is unusual about it.
 | [Apple](strategies/apple.md) | OpenID Connect | signing in; the callback is a `POST` |
 | [HubSpot](strategies/hubspot.md) | OAuth 2 | the HubSpot API |
 | [Relatel](strategies/relatel.md) | OAuth 2 | the Relatel API |
+| [Tavle](strategies/tavle.md) | OAuth 2 | signing in with Tavle, and the boards API |
 | [Shopify](strategies/shopify.md) | OAuth 2 with a field | a shop's Admin API |
 | [e-conomic](strategies/economic.md) | fields only | the e-conomic API |
 | [Adversus](strategies/adversus.md) | fields only | the Adversus API |
