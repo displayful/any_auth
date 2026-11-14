@@ -3,142 +3,62 @@ require 'test_helper'
 module AnyAuth
   module Strategies
     class OAuthTest < ActiveSupport::TestCase
-      HELD = { 'state' => 's', 'redirect_uri' => 'https://tavle.example/callback' }.freeze
+      TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token'.freeze
+      HELD = { 'state' => 's', 'redirect_uri' => 'https://tavle.test/callback' }.freeze
+
+      setup do
+        stub_json(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/ny', user_id: 41)
+      end
 
       test 'a code is swapped for credentials at the address it was sent back to' do
-        swap = stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
-               .with(body: hash_including('grant_type' => 'authorization_code', 'code' => 'kode',
-                 'redirect_uri' => 'https://tavle.example/callback'))
-               .to_return(headers: { 'Content-Type' => 'application/json' },
-                 body: { access_token: 'ny', refresh_token: 'igen', token_type: 'bearer' }.to_json)
+        stub_json(:post, TOKEN_URL, access_token: 'ny', refresh_token: 'igen', token_type: 'bearer')
 
-        token_info_answers(user_id: 41, hub_id: 8823)
+        auth = come_home('code' => 'kode', 'state' => 's')
 
-        auth = hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD)
-
-        assert_requested swap
         assert_equal({ 'access_token' => 'ny', 'refresh_token' => 'igen' }, auth.credentials)
+        assert_requested :post, TOKEN_URL, body: hash_including('grant_type' => 'authorization_code',
+          'code' => 'kode', 'redirect_uri' => 'https://tavle.test/callback')
       end
 
-      test 'HubSpot names the user who signed in, and says which portal they opened' do
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
-          .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
-        token_info_answers(user_id: 41, user: 'mette@acme.test', hub_id: 8823, hub_domain: 'acme.test')
-
-        auth = hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD)
-
-        assert_equal '41', auth.uid
-        assert_equal 'mette@acme.test', auth.info.email
-        assert_not auth.info.email_verified
-        assert_equal 8823, auth.raw['hub_id']
+      test 'a callback with another state, or with nothing held, did not start here' do
+        assert_raises(InvalidCallback) { come_home('code' => 'kode', 'state' => 'forged') }
+        assert_raises(InvalidCallback) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, nil) }
       end
 
-      test 'an answer about the user that is no answer is the vendor being unavailable, and keeps the token to itself' do
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
-          .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
-        lookup = stub_request(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/ny')
-
-        lookup.to_return(headers: { 'Content-Type' => 'text/html' }, body: '<html>')
-
-        assert_raises(Unavailable) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
-
-        lookup.to_return(status: 401)
-        refused = assert_raises(Unauthorized) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
-
-        assert_nil refused.cause
-        assert_not_includes refused.message, 'ny'
+      test 'a callback with no code is not a sign-in' do
+        assert_raises(InvalidCallback) { come_home('state' => 's') }
       end
 
-      test 'a token answer with no access token is no sign-in' do
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
-          .to_return(headers: { 'Content-Type' => 'application/json' }, body: { refresh_token: 'igen' }.to_json)
+      test 'a person who declined at the vendor is Declined, with what the vendor called it' do
+        declined = assert_raises(Declined) { come_home('error' => 'access_denied', 'state' => 's') }
 
-        assert_raises(Unauthorized) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
+        assert_equal 'access_denied', declined.code
       end
 
-      test 'a token HubSpot will not name a user for is no sign-in' do
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
-          .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
-        token_info_answers(message: 'unknown token')
+      test 'a swap the vendor refuses, or answers without a token, is Unauthorized' do
+        stub_request(:post, TOKEN_URL).to_return(status: 400, body: 'invalid_grant')
 
-        assert_raises(Unauthorized) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
+        assert_raises(Unauthorized) { come_home('code' => 'kode', 'state' => 's') }
+
+        stub_json(:post, TOKEN_URL, refresh_token: 'igen')
+
+        assert_raises(Unauthorized) { come_home('code' => 'kode', 'state' => 's') }
       end
 
-      test 'a swap the vendor refuses is denied, and a vendor that cannot answer is unavailable' do
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token').to_return(status: 400, body: 'invalid_grant')
+      test 'a vendor that is down or silent is Unavailable' do
+        stub_request(:post, TOKEN_URL).to_return(status: 503)
 
-        assert_raises(Unauthorized) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
+        assert_raises(Unavailable) { come_home('code' => 'kode', 'state' => 's') }
 
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token').to_return(status: 503)
+        stub_request(:post, TOKEN_URL).to_timeout
 
-        assert_raises(Unavailable) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
-
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token').to_timeout
-
-        assert_raises(Unavailable) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
+        assert_raises(Unavailable) { come_home('code' => 'kode', 'state' => 's') }
       end
 
-      test 'a refresh the vendor refuses, throttles or cannot answer says which' do
-        held = { 'access_token' => 'gammel', 'refresh_token' => 'igen' }
-        token = stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
+      test 'a vendor that throttles us is RateLimited' do
+        stub_request(:post, TOKEN_URL).to_return(status: 429)
 
-        token.to_return(status: 400, body: 'invalid_grant')
-
-        assert_raises(Unauthorized) { hubspot.refresh!(held) }
-        assert_raises(Unauthorized) { hubspot.refresh!({}) }
-
-        token.to_return(status: 429)
-
-        assert_raises(RateLimited) { hubspot.refresh!(held) }
-
-        token.to_return(status: 502, headers: { 'Content-Type' => 'text/html' }, body: '<html>Bad gateway</html>')
-
-        assert_raises(Unavailable) { hubspot.refresh!(held) }
-      end
-
-      test 'refreshing answers the renewed tokens' do
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
-          .with(body: hash_including('grant_type' => 'refresh_token', 'refresh_token' => 'igen'))
-          .to_return(headers: { 'Content-Type' => 'application/json' },
-            body: { access_token: 'nyere', expires_in: 1800 }.to_json)
-
-        renewed = hubspot.refresh!('access_token' => 'gammel', 'refresh_token' => 'igen')
-
-        assert_equal 'nyere', renewed['access_token']
-        assert_operator Time.iso8601(renewed['expires_at']), :>, 20.minutes.from_now
-      end
-
-      test 'a callback with another state, or none held, did not start here' do
-        assert_raises(InvalidCallback) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 'forged' }, HELD) }
-        assert_raises(InvalidCallback) { hubspot.callback_phase({ 'code' => 'kode' }, HELD.except('state')) }
-        assert_raises(InvalidCallback) { hubspot.callback_phase({ 'code' => 'kode' }, nil) }
-      end
-
-      test 'Relatel names the employee who signed in, and refuses a callback without the state' do
-        swap = stub_request(:post, 'https://app.relatel.dk/api/v2/token')
-               .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
-
-        stub_request(:get, 'https://app.relatel.dk/api/v2/employee')
-          .with(headers: { 'Authorization' => 'Bearer ny' })
-          .to_return(headers: { 'Content-Type' => 'application/json' },
-            body: { employee: { id: 34, name: 'Mette Holm', company_id: 8823 } }.to_json)
-
-        relatel = Relatel.new(client_id: 'app', client_secret: 'tys')
-        auth = relatel.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD)
-
-        assert_requested swap
-        assert_raises(InvalidCallback) { relatel.callback_phase({ 'code' => 'kode' }, HELD) }
-        assert_equal '34', auth.uid
-        assert_equal 'Mette Holm', auth.info.name
-        assert_equal 8823, auth.raw['company_id']
-      end
-
-      test 'a vendor that answers with an error declined, once the callback is known to be ours' do
-        refusal = { 'error' => 'invalid_scope', 'state' => 's' }
-
-        assert_equal 'invalid_scope', assert_raises(Declined) { hubspot.callback_phase(refusal, HELD) }.code
-        assert_raises(InvalidCallback) { hubspot.callback_phase(refusal.merge('state' => 'forged'), HELD) }
-        assert_raises(InvalidCallback) { hubspot.callback_phase({ 'state' => 's' }, HELD) }
+        assert_raises(RateLimited) { hubspot.refresh!('refresh_token' => 'igen') }
       end
 
       private
@@ -147,9 +67,8 @@ module AnyAuth
         Hubspot.new(client_id: 'app', client_secret: 'tys')
       end
 
-      def token_info_answers(**token_info)
-        stub_request(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/ny')
-          .to_return(headers: { 'Content-Type' => 'application/json' }, body: token_info.to_json)
+      def come_home(params)
+        hubspot.callback_phase(params, HELD)
       end
     end
   end

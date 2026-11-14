@@ -71,6 +71,9 @@ module AnyAuth
 
     test 'a provider keeps the name it was configured under' do
       assert_equal 'google', @config.strategy(:google, provider: 'another').provider
+    end
+
+    test 'an option the strategy does not have is an error' do
       assert_raises(ActiveModel::UnknownAttributeError) { @config.strategy(:google, scoop: 'email') }
       assert_raises(ActiveModel::UnknownAttributeError) { @config.strategy(:google, authorize_options: [:scoop]) }
     end

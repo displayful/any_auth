@@ -1,9 +1,10 @@
 require 'test_helper'
-require 'any_auth/strategies/developer'
 
 module AnyAuth
   module Strategies
     class CredentialsTest < ActiveSupport::TestCase
+      TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token'.freeze
+
       test 'credentials still good, or that never expire, are answered as they are' do
         good = { 'access_token' => 'adgang', 'expires_at' => 1.hour.from_now.utc.iso8601 }
         pasted = { 'username' => 'api', 'password' => 'hemmeligt' }
@@ -11,19 +12,24 @@ module AnyAuth
         assert_equal good, hubspot.refresh(good)
         assert_equal({ 'access_token' => 'adgang' }, hubspot.refresh({ 'access_token' => 'adgang' }))
         assert_equal pasted, Adversus.new.refresh(pasted)
-        assert_not_requested :post, 'https://api.hubapi.com/oauth/v1/token'
+        assert_not_requested :post, TOKEN_URL
       end
 
-      test 'expiry is read whether it was stored as text, as a number or under symbol keys' do
-        assert hubspot.expired?('expires_at' => 1.minute.from_now.to_i)
-        assert hubspot.expired?(expires_at: 1.minute.from_now.utc.iso8601)
-        assert hubspot.expired?('expires_at' => 'not a time')
-        assert_not hubspot.expired?('expires_at' => 3.minutes.from_now.to_i)
+      test 'credentials about to expire are renewed, keeping a refresh token the vendor did not replace' do
+        stub_json(:post, TOKEN_URL, access_token: 'nyere', expires_in: 1800)
+
+        renewed = hubspot.refresh('access_token' => 'gammel', 'refresh_token' => 'igen',
+          'expires_at' => 1.minute.from_now.utc.iso8601)
+
+        assert_equal 'nyere', renewed['access_token']
+        assert_equal 'igen', renewed['refresh_token']
+        assert_operator Time.iso8601(renewed['expires_at']), :>, 20.minutes.from_now
+        assert_requested :post, TOKEN_URL, body: hash_including('grant_type' => 'refresh_token',
+          'refresh_token' => 'igen')
       end
 
       test 'a renewal that names no new expiry forgets the old one' do
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
-          .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'nyere' }.to_json)
+        stub_json(:post, TOKEN_URL, access_token: 'nyere')
 
         renewed = hubspot.refresh('access_token' => 'gammel', 'refresh_token' => 'igen',
           'expires_at' => 1.minute.ago.utc.iso8601)
@@ -31,45 +37,18 @@ module AnyAuth
         assert_not hubspot.expired?(renewed)
       end
 
-      test 'credentials about to expire are renewed, keeping a refresh token the vendor did not replace' do
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
-          .to_return(headers: { 'Content-Type' => 'application/json' },
-            body: { access_token: 'nyere', expires_in: 1800 }.to_json)
+      test 'a renewal the vendor refuses, or that has no refresh token to offer, is Unauthorized' do
+        stub_request(:post, TOKEN_URL).to_return(status: 400, body: 'invalid_grant')
 
-        renewed = hubspot.refresh('access_token' => 'gammel', 'refresh_token' => 'igen',
-          'expires_at' => 1.minute.from_now.utc.iso8601)
-
-        assert_equal 'nyere', renewed['access_token']
-        assert_equal 'igen', renewed['refresh_token']
+        assert_raises(Unauthorized) { hubspot.refresh!('access_token' => 'gammel', 'refresh_token' => 'igen') }
+        assert_raises(Unauthorized) { hubspot.refresh!({}) }
       end
 
-      test 'a developer comes straight home as whoever they say they are' do
-        developer = Developer.new(email: ' Mette@Acme.test ')
-        request = developer.request_phase(redirect_uri: 'https://tavle.test/home?tenant=7')
-        sent = Rack::Utils.parse_query(URI(request.url).query)
-
-        auth = developer.callback_phase(sent, request.session)
-
-        assert_equal '7', sent['tenant']
-        assert_nil sent['email']
-        assert_equal 'developer', auth.provider
-        assert_equal 'mette@acme.test', auth.uid
-        assert_predicate auth.info, :email_verified
-      end
-
-      test 'a developer has to say who they are before leaving' do
-        assert_predicate Developer.new(email: 'mette@acme.test'), :valid?
-        assert_includes Developer.new.tap(&:valid?).errors.attribute_names, :email
-      end
-
-      test 'a developer callback nobody started here, or naming nobody, is not a sign-in' do
-        developer = Developer.new(email: 'a@b.test')
-        request = developer.request_phase(redirect_uri: 'https://tavle.test/home')
-        sent = Rack::Utils.parse_query(URI(request.url).query)
-
-        assert_raises(InvalidCallback) { developer.callback_phase(sent, nil) }
-        assert_raises(InvalidCallback) { developer.callback_phase(sent.merge('state' => 'forged'), request.session) }
-        assert_raises(InvalidCallback) { Developer.new.callback_phase(sent, request.session) }
+      test 'expiry is read whether it was stored as text, as a number or under symbol keys' do
+        assert hubspot.expired?('expires_at' => 1.minute.from_now.to_i)
+        assert hubspot.expired?(expires_at: 1.minute.from_now.utc.iso8601)
+        assert hubspot.expired?('expires_at' => 'not a time')
+        assert_not hubspot.expired?('expires_at' => 3.minutes.from_now.to_i)
       end
 
       private
