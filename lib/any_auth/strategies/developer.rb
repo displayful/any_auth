@@ -16,7 +16,7 @@ module AnyAuth
       end
 
       def callback_phase(params, session)
-        state = session.to_h['state']
+        state = session['state']
         raise InvalidCallback, 'Invalid state' unless secure_compare(state, params['state'])
         raise InvalidCallback, 'Missing email' unless valid?
 

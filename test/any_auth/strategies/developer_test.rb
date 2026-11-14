@@ -31,7 +31,7 @@ module AnyAuth
         sent = query_of(request.url)
         forged = sent.merge('state' => 'forged')
 
-        assert_raises(InvalidCallback) { developer.callback_phase(sent, nil) }
+        assert_raises(InvalidCallback) { developer.callback_phase(sent, {}) }
         assert_raises(InvalidCallback) { developer.callback_phase(forged, request.session) }
         assert_raises(InvalidCallback) { Developer.new.callback_phase(sent, request.session) }
       end

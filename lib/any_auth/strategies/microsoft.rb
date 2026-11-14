@@ -10,7 +10,6 @@ module AnyAuth
           site: 'https://login.microsoftonline.com',
           authorize_url: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
           token_url: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
-          auth_scheme: :request_body,
         }
       end
 

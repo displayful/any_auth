@@ -18,7 +18,6 @@ module AnyAuth
           site: URI::HTTPS.build(host: shop).to_s,
           authorize_url: '/admin/oauth/authorize',
           token_url: '/admin/oauth/access_token',
-          auth_scheme: :request_body,
         }
       end
 

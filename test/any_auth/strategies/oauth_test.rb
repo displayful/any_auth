@@ -28,7 +28,7 @@ module AnyAuth
         forged = callback_params(state: 'forged')
 
         assert_raises(InvalidCallback) { hubspot.callback_phase(forged, stored_session) }
-        assert_raises(InvalidCallback) { hubspot.callback_phase(callback_params, nil) }
+        assert_raises(InvalidCallback) { hubspot.callback_phase(callback_params, {}) }
       end
 
       test 'a callback with no code is not a sign-in' do

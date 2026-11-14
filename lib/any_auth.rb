@@ -26,10 +26,10 @@ module AnyAuth
     end
   end
 
-  InvalidCallback = Class.new(Error)
-  Unauthorized = Class.new(Error)
-  Unavailable = Class.new(Error)
-  RateLimited = Class.new(Unavailable)
+  class InvalidCallback < Error; end
+  class Unauthorized < Error; end
+  class Unavailable < Error; end
+  class RateLimited < Unavailable; end
 
   class Declined < Error
     def initialize(code)

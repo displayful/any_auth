@@ -47,19 +47,9 @@ module AnyAuth
         assert_raises(Unauthorized) { hubspot.refresh!({}) }
       end
 
-      test 'expiry is read whether it was stored as text, as a number or under symbol keys' do
-        assert hubspot.expired?('expires_at' => 1.minute.from_now.to_i)
-        assert hubspot.expired?(expires_at: 1.minute.from_now.utc.iso8601)
-        assert hubspot.expired?('expires_at' => 'not a time')
-        assert_not hubspot.expired?('expires_at' => 3.minutes.from_now.to_i)
-      end
-
-      test 'expiry is read from a time, and from seconds written as text' do
-        assert hubspot.expired?('expires_at' => 1.minute.ago)
-        assert hubspot.expired?('expires_at' => 1.minute.ago.in_time_zone('Copenhagen'))
-        assert hubspot.expired?('expires_at' => 1.minute.ago.to_i.to_s)
-        assert_not hubspot.expired?('expires_at' => 1.hour.from_now)
-        assert_not hubspot.expired?('expires_at' => 1.hour.from_now.to_i.to_s)
+      test 'credentials count as expired two minutes early' do
+        assert hubspot.expired?(expiring(1.minute.from_now))
+        assert_not hubspot.expired?(expiring(3.minutes.from_now))
       end
 
       private

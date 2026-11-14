@@ -16,17 +16,21 @@ module AnyAuth
       authorize_option :scope
 
       def request_phase(redirect_uri:, **params)
-        session = { 'state' => SecureRandom.hex(24), 'redirect_uri' => redirect_uri }
-        params = params.merge(pkce_params(session)) if pkce?
-        url = client.auth_code.authorize_url(
-          **authorize_params, **params, redirect_uri:, state: session['state']
-        )
+        state = SecureRandom.hex(24)
+        session = { 'state' => state, 'redirect_uri' => redirect_uri }
+
+        if pkce?
+          pkce = PKCE.pair
+          session['code_verifier'] = pkce.verifier
+          params = params.merge(code_challenge: pkce.challenge, code_challenge_method: 'S256')
+        end
+
+        url = client.auth_code.authorize_url(**authorize_params, **params, redirect_uri:, state:)
 
         Request.new(url:, session:)
       end
 
       def callback_phase(params, session)
-        session = session.to_h
         verify(params, session)
         token = exchange(params['code'], session)
 
@@ -34,11 +38,9 @@ module AnyAuth
       end
 
       def expired?(credentials)
-        value = credentials.to_h.stringify_keys['expires_at']
-        return false if value.blank?
+        expires_at = credentials['expires_at']&.to_time
 
-        time = parse_time(value)
-        time.nil? || time.before?(2.minutes.from_now)
+        expires_at.present? && expires_at.before?(2.minutes.from_now)
       end
 
       def refresh(credentials)
@@ -48,7 +50,6 @@ module AnyAuth
       end
 
       def refresh!(credentials)
-        credentials = credentials.to_h.stringify_keys
         token = with_error_handling { OAuth2::AccessToken.from_hash(client, credentials).refresh }
 
         credentials.except('expires_at').merge(credentials_from(token))
@@ -58,13 +59,6 @@ module AnyAuth
 
       def authorize_params
         authorize_options.index_with { public_send(it) }.compact_blank
-      end
-
-      def pkce_params(session)
-        pair = PKCE.pair
-        session['code_verifier'] = pair.verifier
-
-        { code_challenge: pair.challenge, code_challenge_method: 'S256' }
       end
 
       def verify(params, session)
@@ -101,21 +95,8 @@ module AnyAuth
         }.compact
       end
 
-      def parse_time(value)
-        case value
-        when Time then value
-        when Numeric then Time.at(value)
-        when /\A\d+\z/ then Time.at(value.to_i)
-        when String then value.to_time(:utc)
-        end
-      rescue ArgumentError
-        nil
-      end
-
       def client
-        OAuth2::Client.new(client_id, client_secret, client_options) do
-          it.request :url_encoded
-        end
+        OAuth2::Client.new(client_id, client_secret, auth_scheme: :request_body, **client_options)
       end
 
       def get(token, path)

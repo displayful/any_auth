@@ -10,15 +10,13 @@ module AnyAuth
           site: 'https://app.relatel.dk',
           authorize_url: '/api/v2/authorize',
           token_url: 'https://app.relatel.dk/api/v2/token',
-          auth_scheme: :request_body,
         }
       end
 
       private
 
       def identity(token, _session)
-        employee = get(token, '/api/v2/employee')['employee']
-        employee = {} unless employee.is_a?(Hash)
+        employee = get(token, '/api/v2/employee')['employee'] || {}
         raise Unauthorized, "#{provider} returned no employee" if employee['id'].blank?
 
         {

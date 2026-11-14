@@ -36,15 +36,10 @@ module AnyAuth
           site: ISSUER,
           authorize_url: '/auth/authorize',
           token_url: '/auth/token',
-          auth_scheme: :request_body,
         }
       end
 
       private
-
-      def identity_from(claims)
-        { uid: fetch_claim(claims, 'sub'), info: info_from(claims) }
-      end
 
       def valid_issuer?(claims)
         claims['iss'] == ISSUER

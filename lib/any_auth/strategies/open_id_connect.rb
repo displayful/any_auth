@@ -26,12 +26,20 @@ module AnyAuth
       end
 
       def decode_id_token(token)
-        claims = JWT.decode(token.params.fetch('id_token'), nil, false).first
+        claims = JWT.decode(token.params['id_token'], nil, false).first
         raise Unauthorized, 'Invalid ID token' unless claims.is_a?(Hash)
 
         claims
-      rescue JWT::DecodeError, KeyError, ArgumentError, TypeError
-        raise Unauthorized, 'Missing ID token'
+      rescue JWT::DecodeError
+        raise Unauthorized, 'Invalid ID token'
+      end
+
+      def identity_from(claims)
+        { uid: fetch_claim(claims, 'sub'), info: info_from(claims) }
+      end
+
+      def info_from(claims)
+        Info.new(name: claims['name'], email: claims['email'], image: claims['picture'])
       end
 
       def valid_claims?(claims, session)

@@ -164,7 +164,7 @@ credentials = strategy.refresh(credentials)   # renewed if about to expire, othe
 
 | | |
 | --- | --- |
-| `expired?(credentials)` | the access token runs out within two minutes |
+| `expired?(credentials)` | the access token runs out within two minutes. Credentials are the string-keyed hash `auth.credentials` gave you, as JSON stores it |
 | `refresh(credentials)` | renews when expired; returns the whole hash either way |
 | `refresh!(credentials)` | asks the vendor now |
 

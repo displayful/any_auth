@@ -10,7 +10,6 @@ module AnyAuth
           site: 'https://tavle.co',
           authorize_url: '/oauth/authorize',
           token_url: '/oauth/token',
-          auth_scheme: :request_body,
         }
       end
 

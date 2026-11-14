@@ -10,15 +10,10 @@ module AnyAuth
           site: 'https://www.googleapis.com',
           authorize_url: 'https://accounts.google.com/o/oauth2/v2/auth',
           token_url: 'https://oauth2.googleapis.com/token',
-          auth_scheme: :request_body,
         }
       end
 
       private
-
-      def identity_from(claims)
-        { uid: fetch_claim(claims, 'sub'), info: info_from(claims) }
-      end
 
       def info_from(claims)
         Info.new(

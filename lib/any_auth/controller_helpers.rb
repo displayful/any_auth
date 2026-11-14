@@ -7,11 +7,11 @@ module AnyAuth
     def redirect_to_provider(strategy, redirect_uri:, params: {})
       auth_request = strategy.request_phase(redirect_uri:)
       session[:any_auth] = {
-        provider: strategy.provider,
-        request: auth_request.session,
-        attributes: strategy.attributes,
-        params:,
-        expires_at: 10.minutes.from_now.to_i,
+        'provider' => strategy.provider,
+        'request' => auth_request.session,
+        'attributes' => strategy.attributes,
+        'params' => params,
+        'expires_at' => 10.minutes.from_now.to_i,
       }
 
       redirect_to auth_request.url, allow_other_host: true
@@ -20,22 +20,23 @@ module AnyAuth
     def authenticate_with_provider(strategy)
       stored = stored_any_auth_request(strategy)
       session.delete(:any_auth)
-      strategy.assign_attributes(stored[:attributes].slice(*strategy.class.attribute_names))
+      raise InvalidCallback, 'No sign-in in progress' if stored.empty?
 
-      auth = strategy.callback_phase(request.query_parameters, stored[:request])
-      auth.with(params: stored[:params])
+      strategy.assign_attributes(stored['attributes'].slice(*strategy.class.attribute_names))
+      auth = strategy.callback_phase(request.query_parameters, stored['request'])
+      auth.with(params: stored['params'])
     end
 
     def any_auth_params(strategy)
-      stored_any_auth_request(strategy)[:params]
+      stored_any_auth_request(strategy).fetch('params', {})
     end
 
     def stored_any_auth_request(strategy)
-      stored = session.fetch(:any_auth, {}).with_indifferent_access
-      expires_at = Time.at(stored[:expires_at].to_i)
-      return stored if stored[:provider] == strategy.provider && expires_at.future?
+      stored = session[:any_auth]
+      return {} unless stored && stored['provider'] == strategy.provider
+      return {} unless Time.at(stored['expires_at']).future?
 
-      { request: {}, attributes: {}, params: {} }.with_indifferent_access
+      stored
     end
   end
 end
