@@ -26,29 +26,30 @@ should not exist.
 
 ## Using it
 
-It goes through the same two phases as every other strategy, so a controller
-needs no special case. `request_phase` sends the person straight to your own
-callback with the email in the address, and `callback_phase` reads it there:
+It goes through the same two calls as every other strategy, so a controller
+needs no special case. Ask for the email with a form for the strategy, as for
+[any strategy with fields](../../README.md#showing-the-form):
 
 ```ruby
-developer = AnyAuth.strategy(:developer, params.expect(strategy: [:email]))
+def create
+  developer = AnyAuth.strategy(:developer, params.expect(strategy: [:email]))
 
-if developer.valid?
-  redirect_to_provider developer, redirect_uri: callback_url
-else
-  render :new, status: :unprocessable_content
+  if developer.valid?
+    redirect_to_provider developer, redirect_uri: callback_url
+  else
+    render :new, status: :unprocessable_content
+  end
 end
 
-# … and in the callback
-auth = authenticate_with_provider(AnyAuth.strategy(:developer))
+def callback
+  auth = authenticate_with_provider(AnyAuth.strategy(:developer))
+end
 ```
 
-Ask for the email with a form for the strategy, as for
-[any strategy with fields](../../README.md#showing-the-form). A blank email is
+The person is sent straight to your own callback. The email is remembered
+with the sign-in, not put in the address, and the callback still has to belong
+to a sign-in started in this browser, as with any vendor. A blank email is
 invalid, so the form comes back with the error.
-
-The callback still has to belong to a sign-in started in this browser, as with
-any vendor.
 
 ## What comes back
 

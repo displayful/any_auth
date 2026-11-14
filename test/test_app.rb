@@ -22,6 +22,6 @@ TestApp.routes.draw do
   scope ':provider', controller: 'any_auth/controller_helpers_test/sign_ins' do
     post 'leave', action: :create
     get 'home', action: :show
-    get 'stored', action: :stored
+    get 'remembered', action: :remembered
   end
 end

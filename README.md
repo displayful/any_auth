@@ -4,24 +4,25 @@ OmniAuth's strategies, without the Rack.
 
 A strategy is a plain Ruby object for one vendor. It knows the vendor's
 endpoints, builds the address to send a person to, and turns what comes back
-into credentials and, for sign-in, an identity. Your controller calls it. A
-strategy never touches a request, a session or a database, so Rails' own
-sign-in, CSRF protection and tenancy apply to every step.
+into credentials and, for sign-in, an identity. Your controller calls it
+through two helpers, so Rails' own sign-in, CSRF protection and tenancy apply
+to every step. A strategy never touches a request, a session or a database.
 
 ```ruby
-google = AnyAuth::Strategies::Google.new(client_id:, client_secret:)
+class AuthController < ApplicationController
+  include AnyAuth::ControllerHelpers
 
-request = google.request_phase(redirect_uri: "https://app.test/auth/google/callback")
-request.url       # send the person here
-request.session   # keep this until they come back
+  def create
+    redirect_to_provider AnyAuth.strategy(:google), redirect_uri: auth_callback_url
+  end
 
-auth = google.callback_phase(request.query_parameters, stored)   # stored: request.session from before
-auth.uid          # "1184…"
-auth.info.email   # "mette@acme.test"
+  def callback
+    auth = authenticate_with_provider(AnyAuth.strategy(:google))
+    auth.uid          # "1184…"
+    auth.info.email   # "mette@acme.test"
+  end
+end
 ```
-
-Both arguments to `callback_phase` are string-keyed hashes. Pass
-`request.query_parameters`, not Rails' `params`.
 
 ## Why not OmniAuth
 
@@ -93,40 +94,39 @@ class AuthController < ApplicationController
 end
 ```
 
-That is the whole integration. `redirect_to_provider` keeps the request in an
-encrypted, HTTP-only cookie for ten minutes and sends the person off;
-`authenticate_with_provider` reads it, removes it and answers the `auth`. Rails
-expires the cookie, so there is nothing to clean up, and no session is needed.
-The route constraint names the providers people may sign in with: the registry
-can also hold providers you only connect APIs through, and those must not get a
-sign-in address.
+That is the whole integration. `redirect_to_provider` remembers the sign-in in
+the Rails session for ten minutes and sends the person off;
+`authenticate_with_provider` takes it back, checks the callback against it and
+answers the `auth`. The route constraint names the providers people may sign
+in with: the registry can also hold providers you only connect APIs through,
+and those must not get a sign-in address.
 
-Anything else you pass to `redirect_to_provider`, such as
-`return_to: params[:return_to]`, is kept with the request.
-`authenticate_with_provider` does not hand it back; to read it, take the
-request yourself, as the Shopify example below does.
+### Carrying something of your own across
 
-What the helpers need from your app:
+Pass `params:` and read it from the result, as you would `omniauth.params`:
 
-- Ruby 3.4 and Rails 8, with `secret_key_base` set, since the cookie is
-  encrypted.
-- `cookies`. An API-only app needs the `ActionDispatch::Cookies` middleware
-  and `ActionController::Cookies`.
+```ruby
+redirect_to_provider strategy, redirect_uri: callback_url, params: { return_to: params[:return_to] }
+
+auth = authenticate_with_provider(strategy)
+auth.params["return_to"]
+```
+
+`provider_params(strategy)` reads the same values before anything is swapped
+with the vendor, for a check that has to come first or for knowing where a
+failed sign-in started. Values come back through the session, so keys are
+strings.
+
+### What it needs from your app
+
+- Ruby 3.4 and Rails 8, with a session.
 - The callback on the same host the person left from, arriving as a top-level
-  `GET`: the cookie is `SameSite=Lax` and bound to the host.
+  `GET`, so the session cookie comes with it.
 - The button that starts it must not be a Turbo submission
   (`data: { turbo: false }`), or the browser fetches the vendor's page in the
   background and fails.
 - One sign-in per provider at a time in a browser: a second tab replaces the
   first, and reloading the callback is an `InvalidCallback`.
-
-Each provider's request is kept under that provider's name, so a callback for
-one can never use a request that left for another. Pass `as:` to both helpers
-only if one provider needs two sign-ins under way at once.
-
-Underneath are `store_auth_request(name, request, **extra)` and
-`take_auth_request(name)`, for a flow that has to read what it stored before
-it can build the strategy.
 
 ## One place for providers
 
@@ -172,15 +172,17 @@ than the vendor's own `email_verified` claim.
 
 ## Connecting an API instead of signing in
 
-The same two phases, with the scope you need. What you store is
-`auth.credentials`.
+The same two calls, with a provider that carries the scope you need. What you
+store is `auth.credentials`.
 
 ```ruby
-hubspot = AnyAuth::Strategies::Hubspot.new(client_id:, client_secret:)
+config.provider :hubspot, client_id: "…", client_secret: "…", scope: "crm.objects.deals.read"
+```
 
-request = hubspot.request_phase(redirect_uri:, scope: "crm.objects.deals.read")
-auth    = hubspot.callback_phase(request.query_parameters, stored)
+```ruby
+redirect_to_provider AnyAuth.strategy(:hubspot), redirect_uri: callback_url
 
+auth = authenticate_with_provider(AnyAuth.strategy(:hubspot))
 auth.credentials
 # => { "access_token" => "…", "refresh_token" => "…", "expires_at" => "2026-11-13T10:00:00Z" }
 ```
@@ -268,9 +270,9 @@ choose `password_field` for those in your own view.
 
 ### Fields, then a round trip
 
-Validate, then leave. The fields have to come back with the person, because
-the callback needs the same strategy: store them with the request, and build
-the strategy from them again.
+Validate, then leave. The fields come home with the person: the helpers
+remember them and put them back on the strategy, so the callback builds it
+with none.
 
 ```ruby
 class ShopsController < ApplicationController
@@ -284,16 +286,15 @@ class ShopsController < ApplicationController
     @strategy = AnyAuth.strategy(:shopify, fields)
 
     if @strategy.valid?
-      redirect_to_provider @strategy, redirect_uri: callback_shops_url, fields: @strategy.attributes
+      redirect_to_provider @strategy, redirect_uri: callback_shops_url
     else
       render :new, status: :unprocessable_content
     end
   end
 
   def callback
-    stored  = take_auth_request(:shopify)
-    shopify = AnyAuth.strategy(:shopify, stored.to_h.fetch("fields", {}))
-    auth    = shopify.callback_phase(request.query_parameters, stored&.fetch("request"))
+    shopify = AnyAuth.strategy(:shopify)
+    auth    = authenticate_with_provider(shopify)
 
     current_account.shops.create!(credentials: shopify.attributes.merge(auth.credentials))
   end
@@ -310,13 +311,13 @@ What you store is the fields and the tokens together. Later, build the
 strategy from the fields in that hash and hand the whole hash to `refresh`:
 
 ```ruby
-stored  = shop.credentials
-shopify = AnyAuth.strategy(:shopify, stored.slice(*AnyAuth.strategy_class(:shopify).attribute_names))
-shop.update!(credentials: shopify.refresh(stored))
+credentials = shop.credentials
+shopify     = AnyAuth.strategy(:shopify, credentials.slice(*AnyAuth.strategy_class(:shopify).attribute_names))
+shop.update!(credentials: shopify.refresh(credentials))
 ```
 
-A strategy refuses to go anywhere on a shop that is not one: `request_phase`
-raises `ArgumentError` if you skipped `valid?`.
+A strategy refuses to go anywhere on a shop that is not one:
+`redirect_to_provider` raises `ArgumentError` if you skipped `valid?`.
 
 ### Fields and no round trip
 
@@ -337,6 +338,7 @@ typed, call its API once with them before you save.
 | `auth.info` | what is known about them. Always there; empty when the vendor says nothing |
 | `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` when the vendor sends them |
 | `auth.raw` | what the vendor said, as it said it: the ID token's claims, or its answer about the account |
+| `auth.params` | what you passed as `params:` when the person left |
 
 `auth.info` is an `AnyAuth::Info` with the same four members for every vendor.
 Each is nil when the vendor does not say, except `email_verified`, which is then false:
@@ -454,8 +456,8 @@ since vendors name theirs differently.
   `expires_at` as ISO 8601 text, and no `expires`.
 - **`extra.raw_info` is `auth.raw`.** `info` has `name`, `email`,
   `email_verified` and `image` only.
-- **`omniauth.origin` and `omniauth.params`** become the extras you pass to
-  `redirect_to_provider`.
+- **`omniauth.origin` and `omniauth.params`** become `params:` on
+  `redirect_to_provider`, read back as `auth.params`.
 - **A person cancelling at the vendor** is an `AnyAuth::Declined`.
 
 ## Testing
@@ -480,6 +482,23 @@ get auth_callback_path(:google, code: "code", state: sent["state"])
 
 The ID token can be unsigned in a test, because the gem reads it from the
 token endpoint and does not check its signature.
+
+## Outside a Rails controller
+
+The helpers are a thin layer over two plain methods, which take and return
+values and touch nothing else:
+
+```ruby
+request = strategy.request_phase(redirect_uri: "https://app.test/callback")
+request.url       # where to send the person
+request.session   # what to keep until they come back
+
+auth = strategy.callback_phase(query, kept)   # both string-keyed hashes
+```
+
+`query` is what the vendor sent in the callback's query string, and `kept` is
+`request.session` from before. Keeping it somewhere safe, for a limited time
+and for one use, is then yours to do.
 
 ## What it does not do
 

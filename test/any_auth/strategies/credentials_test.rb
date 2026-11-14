@@ -44,13 +44,14 @@ module AnyAuth
       end
 
       test 'a developer comes straight home as whoever they say they are' do
-        request = Developer.new(email: ' Mette@Acme.test ').request_phase(redirect_uri: 'https://tavle.test/home')
-        home = URI(request.url)
-        params = Rack::Utils.parse_query(home.query)
+        developer = Developer.new(email: ' Mette@Acme.test ')
+        request = developer.request_phase(redirect_uri: 'https://tavle.test/home?tenant=7')
+        sent = Rack::Utils.parse_query(URI(request.url).query)
 
-        auth = Developer.new.callback_phase(params, request.session)
+        auth = developer.callback_phase(sent, request.session)
 
-        assert_equal 'tavle.test', home.host
+        assert_equal '7', sent['tenant']
+        assert_nil sent['email']
         assert_equal 'developer', auth.provider
         assert_equal 'mette@acme.test', auth.uid
         assert_predicate auth.info, :email_verified
@@ -62,23 +63,13 @@ module AnyAuth
       end
 
       test 'a developer callback nobody started here, or naming nobody, is not a sign-in' do
-        request = Developer.new.request_phase(redirect_uri: 'https://tavle.test/home')
-        params = Rack::Utils.parse_query(URI(request.url).query)
+        developer = Developer.new(email: 'a@b.test')
+        request = developer.request_phase(redirect_uri: 'https://tavle.test/home')
+        sent = Rack::Utils.parse_query(URI(request.url).query)
 
-        assert_raises(InvalidCallback) { Developer.new.callback_phase(params, request.session) }
-        assert_raises(InvalidCallback) { Developer.new.callback_phase(params.merge('email' => 'a@b.test'), nil) }
-        assert_raises(InvalidCallback) do
-          Developer.new.callback_phase({ 'email' => 'a@b.test', 'state' => 'forged' }, request.session)
-        end
-        assert_raises(InvalidCallback) do
-          Developer.new.callback_phase(params.merge('email' => ['a@b.test']), request.session)
-        end
-      end
-
-      test 'a developer keeps what the address to come home to already asked' do
-        request = Developer.new(email: 'a@b.test').request_phase(redirect_uri: 'https://tavle.test/home?tenant=7')
-
-        assert_equal '7', Rack::Utils.parse_query(URI(request.url).query)['tenant']
+        assert_raises(InvalidCallback) { developer.callback_phase(sent, nil) }
+        assert_raises(InvalidCallback) { developer.callback_phase(sent.merge('state' => 'forged'), request.session) }
+        assert_raises(InvalidCallback) { Developer.new.callback_phase(sent, request.session) }
       end
 
       private

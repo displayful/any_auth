@@ -1,29 +1,39 @@
 require 'test_helper'
 require 'test_app'
+require 'any_auth/strategies/developer'
 
 module AnyAuth
   class ControllerHelpersTest < ActionDispatch::IntegrationTest
     class SignInsController < ActionController::Base
       include ControllerHelpers
 
+      STRATEGIES = { 'hubspot' => Strategies::Hubspot, 'relatel' => Strategies::Relatel,
+                     'developer' => Strategies::Developer }.freeze
+
       rescue_from(InvalidCallback) { head :unprocessable_content }
 
       def create
-        redirect_to_provider strategy, redirect_uri: 'https://tavle.test/home', membership_id: 7
+        strategy.assign_attributes(params.permit(:email))
+
+        redirect_to_provider strategy, redirect_uri: 'https://tavle.test/home', params: { membership_id: 7 }
       end
 
       def show
-        render json: authenticate_with_provider(strategy).credentials
+        auth = authenticate_with_provider(strategy)
+
+        render json: { uid: auth.uid, credentials: auth.credentials, params: auth.params }
       end
 
-      def stored
-        render json: take_auth_request(params[:provider])
+      def remembered
+        render json: provider_params(strategy)
       end
 
       private
 
       def strategy
-        Strategies.const_get(params[:provider].camelize, false).new(client_id: 'app', client_secret: 'tys')
+        @strategy ||= STRATEGIES.fetch(params[:provider]).new.tap do
+          it.assign_attributes(client_id: 'app', client_secret: 'tys') if it.respond_to?(:client_id=)
+        end
       end
     end
 
@@ -34,52 +44,79 @@ module AnyAuth
         .to_return(headers: { 'Content-Type' => 'application/json' }, body: { user_id: 41, hub_id: 8823 }.to_json)
     end
 
-    test 'leaving for a provider and coming home is one call each' do
+    test 'leaving for a provider and coming home is one call each, with what the app asked to remember' do
       post '/hubspot/leave'
-      state = Rack::Utils.parse_query(URI(response.location).query)['state']
 
       assert response.location.start_with?('https://app.hubspot.com/oauth/authorize?')
-      assert_match(/any_auth\.hubspot=.*httponly/i, response.headers['Set-Cookie'])
 
+      get '/hubspot/home', params: { code: 'kode', state: state_sent }
+
+      assert_equal({ 'access_token' => 'ny' }, response.parsed_body['credentials'])
+      assert_equal({ 'membership_id' => 7 }, response.parsed_body['params'])
+    end
+
+    test 'coming home a second time is not a sign-in' do
+      post '/hubspot/leave'
+      state = state_sent
       get '/hubspot/home', params: { code: 'kode', state: }
-
-      assert_equal({ 'access_token' => 'ny' }, response.parsed_body)
-
       get '/hubspot/home', params: { code: 'kode', state: }
 
       assert_response :unprocessable_content
     end
 
-    test 'a request that left for one provider is no use to another' do
+    test 'what one provider kept is no use to another' do
       post '/hubspot/leave'
       get '/relatel/home', params: { code: 'kode' }
 
       assert_response :unprocessable_content
     end
 
-    test 'what the app stored with the request comes back with it' do
+    test 'what the app asked to remember can be read before anything is swapped, and stays' do
       post '/hubspot/leave'
-      get '/hubspot/stored'
+      state = state_sent
+      get '/hubspot/remembered'
 
-      assert_equal 7, response.parsed_body['membership_id']
-      assert_equal 'https://tavle.test/home', response.parsed_body.dig('request', 'redirect_uri')
+      assert_equal({ 'membership_id' => 7 }, response.parsed_body)
+      assert_not_requested :post, 'https://api.hubapi.com/oauth/v1/token'
+
+      get '/hubspot/home', params: { code: 'kode', state: }
+
+      assert_response :success
     end
 
-    test 'a request older than ten minutes is gone' do
+    test 'a sign-in left for more than ten minutes ago is gone' do
       post '/hubspot/leave'
-      state = Rack::Utils.parse_query(URI(response.location).query)['state']
+      state = state_sent
 
       travel 11.minutes do
+        get '/hubspot/remembered'
+
+        assert_empty response.parsed_body
+
         get '/hubspot/home', params: { code: 'kode', state: }
 
         assert_response :unprocessable_content
       end
     end
 
+    test 'the fields a strategy was given come home with it, and never show in the address' do
+      post '/developer/leave', params: { email: 'Mette@Acme.test' }
+
+      assert_not_includes response.location, 'acme'
+
+      get '/developer/home', params: { state: state_sent }
+
+      assert_equal 'mette@acme.test', response.parsed_body['uid']
+    end
+
     private
 
     def app
       TestApp
+    end
+
+    def state_sent
+      Rack::Utils.parse_query(URI(response.location).query)['state']
     end
   end
 end

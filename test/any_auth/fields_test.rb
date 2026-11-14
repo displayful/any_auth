@@ -24,17 +24,15 @@ module AnyAuth
         @strategy = strategy(params.expect(strategy: %i[shop]))
 
         if @strategy.valid?
-          redirect_to_provider @strategy, redirect_uri: 'https://tavle.test/shops/callback',
-            fields: @strategy.attributes
+          redirect_to_provider @strategy, redirect_uri: 'https://tavle.test/shops/callback'
         else
           render inline: FORM, status: :unprocessable_content
         end
       end
 
       def callback
-        stored = take_auth_request(:shopify)
-        shopify = strategy(stored.to_h.fetch('fields', {}))
-        auth = shopify.callback_phase(request.query_parameters, stored&.fetch('request'))
+        shopify = strategy
+        auth = authenticate_with_provider(shopify)
 
         render json: shopify.attributes.merge(auth.credentials)
       end
