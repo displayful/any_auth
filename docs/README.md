@@ -1,0 +1,35 @@
+# AnyAuth documentation
+
+Start with the [README](../README.md) for what AnyAuth is and how a round trip
+works. These pages go one level down.
+
+## Strategies
+
+Each page says what to configure, what the vendor needs from you, what comes
+back, and what is unusual about it.
+
+| Strategy | Kind | For |
+| --- | --- | --- |
+| [Google](strategies/google.md) | OpenID Connect | signing in, and Google APIs |
+| [Microsoft](strategies/microsoft.md) | OpenID Connect | signing in, and Microsoft APIs |
+| [HubSpot](strategies/hubspot.md) | OAuth 2 | the HubSpot API |
+| [Relatel](strategies/relatel.md) | OAuth 2 | the Relatel API |
+| [Shopify](strategies/shopify.md) | OAuth 2 with a field | a shop's Admin API |
+| [e-conomic](strategies/economic.md) | fields only | the e-conomic API |
+| [Adversus](strategies/adversus.md) | fields only | the Adversus API |
+| [Developer](strategies/developer.md) | fields only | signing in locally, with no vendor |
+
+## The three kinds
+
+- **OAuth 2** strategies send the person to the vendor and come back with
+  credentials. `auth.uid` and `auth.info` are nil: ask the vendor's API who the
+  account is.
+- **OpenID Connect** strategies are OAuth 2 plus an answer to who signed in.
+  They always ask for `openid`, send a nonce and a PKCE challenge, and read
+  `auth.uid` and `auth.info` from the ID token.
+- **Fields-only** strategies have no round trip. The person types what the
+  vendor gave them, and `strategy.attributes` is what you store.
+
+Every strategy answers `authorization(credentials)`, the headers its vendor
+wants on an API call, and `fresh(credentials)`, which renews what is about to
+expire and leaves everything else alone.

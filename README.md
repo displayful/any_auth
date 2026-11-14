@@ -294,15 +294,18 @@ apart:
 
 ## Strategies included
 
+Each has its own page under [docs/strategies](docs/strategies): what to
+configure, what the vendor needs, what comes back and what is unusual.
+
 | Strategy | Kind | Notes |
 | --- | --- | --- |
-| `Google` | OpenID Connect | links by email for Gmail and Workspace addresses |
-| `Microsoft` | OpenID Connect | work, school and personal accounts; `uid` is tenant and object id |
-| `Hubspot` | OAuth 2 | |
-| `Relatel` | OAuth 2 | the vendor echoes no state |
-| `Shopify` | OAuth 2 with a field | per-shop endpoints, signed callback, expiring tokens |
-| `Economic`, `Adversus` | fields only | pasted tokens or a login |
-| `Developer` | fields only | type an email and be that person; for development only |
+| [`Google`](docs/strategies/google.md) | OpenID Connect | links by email for Gmail and Workspace addresses |
+| [`Microsoft`](docs/strategies/microsoft.md) | OpenID Connect | work, school and personal accounts; `uid` is tenant and object id |
+| [`Hubspot`](docs/strategies/hubspot.md) | OAuth 2 | |
+| [`Relatel`](docs/strategies/relatel.md) | OAuth 2 | the vendor echoes no state |
+| [`Shopify`](docs/strategies/shopify.md) | OAuth 2 with a field | per-shop endpoints, signed callback, expiring tokens |
+| [`Economic`](docs/strategies/economic.md), [`Adversus`](docs/strategies/adversus.md) | fields only | pasted tokens or a login |
+| [`Developer`](docs/strategies/developer.md) | fields only | type an email and be that person; for development only |
 
 Register `Developer` only where it is safe, for example
 `config.provider :developer if Rails.env.development?`. It has no round trip:
