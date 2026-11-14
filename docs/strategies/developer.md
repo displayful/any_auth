@@ -47,6 +47,7 @@ any vendor.
 | `auth.info.email` | the same address |
 | `auth.info.email_verified` | always true |
 | `auth.credentials` | empty |
+| `auth.raw` | empty |
 
 Because `email_verified` is always true, an app that links accounts by
 verified email will sign you in as any existing person. That is the point,

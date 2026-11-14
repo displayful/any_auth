@@ -26,8 +26,13 @@ that was connected) before it is used.
 
 | | |
 | --- | --- |
-| `auth.uid`, `auth.info` | nil |
+| `auth.uid` | the company's id, as a string |
+| `auth.info` | nil |
 | `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` when Relatel sends them |
+| `auth.raw` | the signed-in employee, as Relatel describes them |
+
+The strategy asks Relatel once, with the new token, who the employee is
+(`GET /api/v2/employee`), and takes the company from the answer.
 
 ## Calling the API
 

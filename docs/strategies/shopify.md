@@ -54,8 +54,10 @@ a bearer token.
 
 | | |
 | --- | --- |
-| `auth.uid`, `auth.info` | nil |
+| `auth.uid` | the shop's `myshopify.com` domain |
+| `auth.info` | nil |
 | `auth.credentials` | `access_token`, `refresh_token`, `expires_at` |
+| `auth.raw` | what Shopify sent with the token, such as the granted `scope` |
 
 Store `strategy.attributes.merge(auth.credentials)`: the shop and the tokens
-together. To name the shop, ask the Admin API for `shop { id name }`.
+together. For the shop's display name, ask the Admin API for `shop { name }`.

@@ -17,7 +17,12 @@ module AnyAuth
       def identity_from(claims)
         raise Unauthorized, 'The ID token was not issued by Google' unless issued_by_google?(claims)
 
-        { uid: required(claims, 'sub'), info: Info.new(email: claims['email'], email_verified: vouched_for?(claims)) }
+        { uid: required(claims, 'sub'), info: info_from(claims) }
+      end
+
+      def info_from(claims)
+        Info.new(name: claims['name'], email: claims['email'], email_verified: vouched_for?(claims),
+          image: claims['picture'])
       end
 
       def issued_by_google?(claims)

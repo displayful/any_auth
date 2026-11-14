@@ -24,7 +24,7 @@ module AnyAuth
         claims = claims_in(token)
         raise Unauthorized, "The ID token from #{provider} is not for this sign-in" unless for_us?(claims, session)
 
-        identity_from(claims)
+        identity_from(claims).merge(raw: claims)
       end
 
       def claims_in(token)

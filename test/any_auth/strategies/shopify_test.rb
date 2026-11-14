@@ -42,6 +42,7 @@ module AnyAuth
 
         assert_requested swap
         assert_equal 'shopify', auth.provider
+        assert_equal 'some-shop.myshopify.com', auth.uid
         assert_equal({ 'access_token' => 'ny', 'refresh_token' => 'igen' }, auth.credentials)
       end
 

@@ -42,6 +42,10 @@ module AnyAuth
         super(code, session, expiring: 1)
       end
 
+      def identity(token, _session)
+        { uid: shop, raw: token.params }
+      end
+
       def signature_of(params)
         OpenSSL::HMAC.hexdigest('SHA256', client_secret, params.except('hmac').sort.map { it.join('=') }.join('&'))
       end

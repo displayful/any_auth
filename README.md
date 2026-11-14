@@ -289,12 +289,41 @@ typed, call its API once with them before you save.
 
 ## What comes back
 
+`callback_phase` answers an `AnyAuth::Auth`:
+
 | | |
 | --- | --- |
 | `auth.provider` | the name the provider is configured under: `"google"`, `"shopify"` |
+| `auth.uid` | who or what was signed in to, as the vendor names it. Stable; use it as the key |
+| `auth.info` | what is known about them, or nil when the vendor says nothing |
 | `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` when the vendor sends them |
-| `auth.uid` | the person's stable id at the vendor; OpenID Connect strategies only |
-| `auth.info` | `email` and `email_verified`; OpenID Connect strategies only |
+| `auth.raw` | what the vendor said, as it said it: the ID token's claims, or its answer about the account |
+
+`auth.info` is an `AnyAuth::Info` with the same four members for every vendor.
+Each is nil when the vendor does not say:
+
+| | |
+| --- | --- |
+| `name` | a name to show: the person's, or the account's |
+| `email` | their address |
+| `email_verified` | whether the vendor vouches that they own it. False unless the strategy is sure |
+| `image` | the address of a picture |
+
+What `uid` and `info` hold differs by vendor, and each
+[strategy's page](docs/strategies) says exactly what:
+
+| Strategy | `uid` | `info` |
+| --- | --- | --- |
+| Google | the person's `sub` | name, email, picture |
+| Microsoft | tenant id and object id | name, email |
+| HubSpot | the portal id | the portal's domain as `name` |
+| Relatel | the company id | nil |
+| Shopify | the shop's domain | nil |
+| Developer | the email typed | that email |
+
+Anything a vendor says beyond these is in `auth.raw`: Google's `hd`,
+Microsoft's `tid`, HubSpot's `user`. Read it there when your app has a rule of
+its own, such as which tenants may sign in.
 
 ## Errors
 

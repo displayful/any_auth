@@ -12,6 +12,16 @@ module AnyAuth
         assert_not info(email: 'mette@acme.test', email_verified: true).email_verified
       end
 
+      test 'Google names the person, with their picture, and hands over what it said' do
+        google = auth(email: 'mette@gmail.com', email_verified: true, name: 'Mette Holm',
+          picture: 'https://g.test/m.png')
+
+        assert_equal 'g-1', google.uid
+        assert_equal 'Mette Holm', google.info.name
+        assert_equal 'https://g.test/m.png', google.info.image
+        assert_equal 'https://accounts.google.com', google.raw['iss']
+      end
+
       test 'an unverified address is never confirmed' do
         assert_not info(email: 'mette@gmail.com', email_verified: false).email_verified
       end

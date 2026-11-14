@@ -65,7 +65,11 @@ module AnyAuth
       end
 
       def identity(_token, _session)
-        { uid: nil, info: nil }
+        {}
+      end
+
+      def asked_with(token, path)
+        asking_the_vendor { token.get(path).parsed }
       end
 
       def credentials_from(token)
@@ -86,12 +90,12 @@ module AnyAuth
       def asking_the_vendor
         yield
       rescue OAuth2::Error => e
-        raise Unauthorized, "#{provider} would not give us a token: #{e.message}"
+        raise Unauthorized, "#{provider} refused us: #{e.message}"
       rescue Faraday::Error, JSON::ParserError => e
         case e.try(:response_status)
-        when 400, 401, 403 then raise Unauthorized, "#{provider} would not give us a token (#{e.response_status})"
+        when 400, 401, 403 then raise Unauthorized, "#{provider} refused us (#{e.response_status})"
         when 429 then raise RateLimited, "#{provider} asked us to slow down"
-        else raise Unavailable, "#{provider} could not be asked for a token (#{e.class.name.demodulize})"
+        else raise Unavailable, "#{provider} could not be reached (#{e.class.name.demodulize})"
         end
       end
     end

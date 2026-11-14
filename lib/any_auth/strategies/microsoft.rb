@@ -19,7 +19,7 @@ module AnyAuth
 
         {
           uid: "#{claims['tid']}:#{required(claims, 'oid')}",
-          info: Info.new(email: claims['email'], email_verified: vouched_for?(claims)),
+          info: Info.new(name: claims['name'], email: claims['email'], email_verified: vouched_for?(claims)),
         }
       end
 

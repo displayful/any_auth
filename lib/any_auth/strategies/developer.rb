@@ -17,7 +17,7 @@ module AnyAuth
         raise InvalidCallback, 'No developer sign-in is under way' unless same?(session.to_h['state'], params['state'])
         raise InvalidCallback, 'The developer sign-in needs an email' if address.blank?
 
-        Auth.new(provider:, uid: address, info: Info.new(email: address, email_verified: true), credentials: {})
+        Auth.new(provider:, uid: address, credentials: {}, info: Info.new(email: address, email_verified: true))
       end
     end
   end

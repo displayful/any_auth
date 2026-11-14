@@ -33,9 +33,11 @@ vouched for.
 | | |
 | --- | --- |
 | `auth.uid` | `<tenant id>:<object id>`. The object id alone is only unique inside its tenant |
+| `auth.info.name` | the `name` claim |
 | `auth.info.email` | the `email` claim |
 | `auth.info.email_verified` | true only for a work or school tenant whose token carries `xms_edov`, Microsoft's statement that the tenant owns the address's domain. Never true for a personal account |
 | `auth.credentials` | `access_token`, `expires_at`, and `refresh_token` with `offline_access` |
+| `auth.raw` | every claim in the ID token, such as `tid`, the tenant, and `xms_edov` |
 
 Microsoft's `email` claim can be set by a tenant administrator to any address,
 which is why it is not trusted on its own. Key people on `auth.uid`, and link
@@ -46,7 +48,7 @@ by email only when `email_verified` is true.
 The ID token is checked for audience, expiry and nonce, and its issuer must be
 `https://login.microsoftonline.com/<tid>/v2.0` for the tenant id in the same
 token. Deciding which tenants may sign in at all is your app's rule, not the
-strategy's.
+strategy's: compare `auth.raw["tid"]` with the tenants you accept.
 
 ## Calling the API
 

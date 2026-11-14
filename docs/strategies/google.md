@@ -31,9 +31,12 @@ and add your callback address as an authorised redirect URI.
 | | |
 | --- | --- |
 | `auth.uid` | the `sub` claim: stable for this person across your client |
+| `auth.info.name` | the `name` claim |
 | `auth.info.email` | the `email` claim |
+| `auth.info.image` | the `picture` claim |
 | `auth.info.email_verified` | true only when Google says the address is verified **and** it is a Gmail address or the token names a Workspace domain (`hd`) |
 | `auth.credentials` | `access_token`, `expires_at`, and `refresh_token` when you asked for `access_type: "offline"` |
+| `auth.raw` | every claim in the ID token, such as `hd`, the Workspace domain |
 
 The stricter `email_verified` is deliberate. Google marks many addresses it
 does not host as verified; only for Gmail and Workspace does it speak for the

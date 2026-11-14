@@ -22,11 +22,14 @@ redirect URL, and tick the same scopes you ask for.
 
 | | |
 | --- | --- |
-| `auth.uid`, `auth.info` | nil |
+| `auth.uid` | the portal's `hub_id`, as a string |
+| `auth.info.name` | the portal's domain |
 | `auth.credentials` | `access_token`, `refresh_token`, `expires_at` |
+| `auth.raw` | HubSpot's answer about the token: `hub_id`, `hub_domain`, `user`, `scopes` |
 
-To learn which portal was connected, ask HubSpot with the token:
-`GET /oauth/v1/access-tokens/<access_token>` answers its `hub_id` and domain.
+The strategy asks HubSpot once, with the new token, which portal it belongs to
+(`GET /oauth/v1/access-tokens/<access_token>`). A token HubSpot names no
+portal for is an `AnyAuth::Unauthorized`.
 
 ## Calling the API
 
