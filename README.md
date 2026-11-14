@@ -34,14 +34,12 @@ AnyAuth.configure do |config|
 end
 
 # config/routes.rb
-constraints provider: /google|microsoft/ do
-  post "auth/:provider",          to: "auth#create",   as: :auth
-  get  "auth/:provider/callback", to: "auth#callback", as: :auth_callback
-end
+post "auth/:provider",          to: "auth#create",   as: :auth
+get  "auth/:provider/callback", to: "auth#callback", as: :auth_callback
 ```
 
-The constraint names the providers people may sign in with. Start the sign-in
-with a `POST` that is not a Turbo submission (`data: { turbo: false }`).
+Start the sign-in with a `POST` that is not a Turbo submission
+(`data: { turbo: false }`).
 
 ## Controller helpers
 
