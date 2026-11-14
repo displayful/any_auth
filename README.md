@@ -1,125 +1,168 @@
 # AnyAuth
 
-Sign in at a vendor from a Rails controller. One strategy class per vendor,
-with the phases OmniAuth names, called from your own actions.
-
-```ruby
-class AuthController < ApplicationController
-  include AnyAuth::ControllerHelpers
-
-  def create
-    redirect_to_provider AnyAuth.strategy(:google), redirect_uri: auth_callback_url
-  end
-
-  def callback
-    auth = authenticate_with_provider(AnyAuth.strategy(:google))
-    auth.uid          # "1184…"
-    auth.info.email   # "mette@acme.test"
-  end
-end
-```
+Sign people in with Google, Microsoft, Apple and others, and connect your app
+to vendors' APIs, from your own Rails controllers. One strategy class per
+vendor, with the request and callback phases OmniAuth names, and no Rack
+middleware.
 
 Needs Ruby 3.4, Rails 8 and a session.
 
-## Setup
+- [Sign in with Google and Microsoft](#sign-in-with-google-and-microsoft)
+- [Connect to a vendor's API](#connect-to-a-vendors-api)
+- [Reference](#reference)
+- [Writing a strategy](#writing-a-strategy)
+- [Coming from OmniAuth](#coming-from-omniauth)
+- [Testing](#testing)
+- [Developer docs](docs/README.md): adding a strategy, how a sign-in works, each strategy
+
+## Sign in with Google and Microsoft
+
+### 1. Install
 
 ```ruby
 # Gemfile
 gem "any_auth", github: "displayful/any_auth"
+```
 
+### 2. Register the providers
+
+Create an OAuth client at each vendor and add your callback address as a
+redirect URI: `https://example.com/auth/google/callback`. Each
+[strategy page](docs/strategies) says where.
+
+```ruby
 # config/initializers/any_auth.rb
 AnyAuth.configure do |config|
-  config.provider :google,    client_id: ENV["GOOGLE_CLIENT_ID"],    client_secret: ENV["GOOGLE_CLIENT_SECRET"]
-  config.provider :microsoft, client_id: ENV["MICROSOFT_CLIENT_ID"], client_secret: ENV["MICROSOFT_CLIENT_SECRET"]
+  config.provider :google,
+    client_id: ENV["GOOGLE_CLIENT_ID"], client_secret: ENV["GOOGLE_CLIENT_SECRET"]
+  config.provider :microsoft,
+    client_id: ENV["MICROSOFT_CLIENT_ID"], client_secret: ENV["MICROSOFT_CLIENT_SECRET"]
 end
+```
 
+### 3. Add two routes
+
+```ruby
 # config/routes.rb
 post "auth/:provider",          to: "auth#create",   as: :auth
 get  "auth/:provider/callback", to: "auth#callback", as: :auth_callback
 ```
 
-Start the sign-in with a `POST` that is not a Turbo submission
-(`data: { turbo: false }`).
-
-## Controller helpers
-
-| | |
-| --- | --- |
-| `redirect_to_provider(strategy, redirect_uri:, params: {})` | sends the person to the vendor |
-| `authenticate_with_provider(strategy)` | checks the callback, swaps the code, returns the `auth` |
-| `any_auth_params(strategy)` | the `params:` you passed, readable before the code is swapped |
-
-The sign-in is kept in the session for ten minutes and used once. One sign-in
-at a time: a second replaces the first.
+### 4. Write the controller
 
 ```ruby
-redirect_to_provider strategy, redirect_uri: callback_url, params: { return_to: "/boards" }
+class AuthController < ApplicationController
+  include AnyAuth::ControllerHelpers
 
-auth = authenticate_with_provider(strategy)
-auth.params[:return_to]   # "/boards"
+  SIGN_IN = %w[google microsoft]
+
+  before_action :set_strategy
+  rescue_from AnyAuth::Error, with: :refused
+
+  def create
+    redirect_to_provider @strategy, redirect_uri: auth_callback_url(params[:provider])
+  end
+
+  def callback
+    auth = authenticate_with_provider(@strategy)
+    user = User.from_any_auth(auth)
+    return refused unless user
+
+    reset_session
+    session[:user_id] = user.id
+    redirect_to root_path
+  end
+
+  private
+
+  def set_strategy
+    return head :not_found unless params[:provider].in?(SIGN_IN)
+
+    @strategy = AnyAuth.strategy(params[:provider])
+  end
+
+  def refused
+    redirect_to sign_in_path, alert: "We could not sign you in. Try another way."
+  end
+end
 ```
 
-## What comes back
+`redirect_to_provider` keeps what the callback needs in the session and sends
+the person to the vendor. `authenticate_with_provider` checks the callback,
+swaps the code for tokens, asks who signed in and returns an `auth`. An
+unknown provider is a 404 because the controller says which providers sign
+people in; `AnyAuth.strategy` raises `KeyError` for a name nobody configured.
 
-| | |
-| --- | --- |
-| `auth.provider` | the name the provider is configured under |
-| `auth.uid` | who signed in, as the vendor identifies them |
-| `auth.info` | `name`, `email`, `image`, nil where the vendor does not say; `email_verified`, false unless it vouches |
-| `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` when sent |
-| `auth.raw` | what the vendor said about who signed in: the ID token's claims, or its answer without the tokens |
-| `auth.params` | what you passed as `params:` |
-
-`uid` is who the vendor's token is for. That is a person, except at Shopify,
-whose tokens belong to a shop, and Tavle, where it is one person in one
-company. A vendor with tenants names the tenant in `raw`:
-
-| Strategy | `uid` | In `raw` |
-| --- | --- | --- |
-| Google | `sub` | `hd`, the Workspace domain |
-| Microsoft | `<tenant id>:<object id>` | `tid`, the tenant |
-| HubSpot | the user's id | `hub_id`, `hub_domain` |
-| Relatel | the employee's id | `company_id` |
-| Tavle | the membership's id | `company` |
-| Shopify | the shop's domain | the granted scope |
-
-Key a person on `provider` and `uid`. Link an existing account by email only
-when `info.email_verified` is true: it means the vendor vouches for the
-address, which is stricter than the vendor's own claim.
-
-## Providers
-
-`config.provider` names a provider and its defaults. What you pass to
-`AnyAuth.strategy` wins.
+### 5. Find the person
 
 ```ruby
-config.provider :google, client_id: -> { ENV["GOOGLE_CLIENT_ID"] }, client_secret: -> { ENV["GOOGLE_CLIENT_SECRET"] }
-config.provider :google_drive, from: :google, scope: "https://www.googleapis.com/auth/drive.file"   # same client
-config.provider :google_workspace, strategy: :google, client_id: "…", client_secret: "…"            # same code
-config.provider :shopify, scope: "read_orders"                                                       # client per tenant
+class User < ApplicationRecord
+  has_many :identities
 
-AnyAuth.strategy(:shopify, client_id: tenant.client_id, client_secret: tenant.client_secret)
-AnyAuth.providers   # => ["google", "google_drive", "google_workspace", "shopify"]
+  def self.from_any_auth(auth)
+    identity = Identity.find_by(provider: auth.provider, uid: auth.uid)
+    return identity.user if identity
+    return unless auth.info.email_verified
+
+    find_by(email: auth.info.email)&.tap do |user|
+      user.identities.create!(provider: auth.provider, uid: auth.uid)
+    end
+  end
+end
 ```
 
-- A callable value is asked each time a strategy is built.
-- A `scope` you set replaces the default `email profile`.
-- Options sent to the vendor are declared per strategy: `scope` everywhere;
-  `access_type`, `prompt`, `hd`, `login_hint` for Google; `prompt`,
-  `login_hint`, `domain_hint` for Microsoft. An unknown option raises
-  `ActiveModel::UnknownAttributeError` when the strategy is built.
+Key a person on `provider` and `uid`. Link to an existing account by email only
+when `auth.info.email_verified` is true: AnyAuth sets it only when the vendor
+can vouch for the mailbox, which is stricter than the vendor's own flag (see
+[Google](docs/strategies/google.md) and [Microsoft](docs/strategies/microsoft.md)).
 
-## Fields
+### 6. Add the buttons
+
+```erb
+<%= button_to "Sign in with Google", auth_path(:google), form: { data: { turbo: false } } %>
+<%= button_to "Sign in with Microsoft", auth_path(:microsoft), form: { data: { turbo: false } } %>
+```
+
+The sign-in starts with a `POST`, and not through Turbo: the browser has to
+follow the redirect to the vendor itself.
+
+### Coming back to where they were
+
+Anything passed as `params:` comes back on the `auth`:
+
+```ruby
+def create
+  redirect_to_provider @strategy, redirect_uri: auth_callback_url(params[:provider]),
+    params: { return_to: params[:return_to] }
+end
+
+def callback
+  auth = authenticate_with_provider(@strategy)
+  # …
+  redirect_to url_from(auth.params["return_to"]) || root_path
+end
+```
+
+`params:` goes through the session as JSON, so its keys come back as strings.
+`url_from` keeps the redirect on your own host.
+
+## Connect to a vendor's API
+
+The same two helpers connect an account at a vendor, here Shopify, whose
+sign-in needs the shop's address first.
+
+```ruby
+config.provider :shopify, client_id: ENV["SHOPIFY_CLIENT_ID"],
+  client_secret: ENV["SHOPIFY_CLIENT_SECRET"], scope: "read_orders"
+```
+
+### Ask for the fields
 
 A strategy is an ActiveModel. Its attributes are what a person types before
-signing in, such as Shopify's shop.
+signing in:
 
 ```ruby
 AnyAuth.strategy_class(:shopify).attribute_names   # => ["shop"]
-
-strategy = AnyAuth.strategy(:shopify, params.expect(strategy: [:shop]))
-strategy.valid?        # false with an error on :shop for anything that is not a shop
-strategy.attributes    # => { "shop" => "mystore.myshopify.com" }
 ```
 
 ```erb
@@ -132,108 +175,195 @@ strategy.attributes    # => { "shop" => "mystore.myshopify.com" }
 ```
 
 ```ruby
-def create
-  @strategy = AnyAuth.strategy(:shopify, params.expect(strategy: [:shop]))
+class ShopsController < ApplicationController
+  include AnyAuth::ControllerHelpers
 
-  if @strategy.valid?
-    redirect_to_provider @strategy, redirect_uri: callback_shops_url
-  else
-    render :new, status: :unprocessable_content
+  def new
+    @strategy = AnyAuth.strategy(:shopify)
   end
-end
 
-def callback
-  shopify = AnyAuth.strategy(:shopify)
-  auth    = authenticate_with_provider(shopify)   # puts the shop back on the strategy
+  def create
+    @strategy = AnyAuth.strategy(:shopify, params.expect(strategy: [:shop]))
 
-  current_account.shops.create!(credentials: shopify.attributes.merge(auth.credentials))
+    if @strategy.valid?
+      redirect_to_provider @strategy, redirect_uri: callback_shops_url
+    else
+      render :new, status: :unprocessable_content
+    end
+  end
+
+  def callback
+    shopify = AnyAuth.strategy(:shopify)
+    auth = authenticate_with_provider(shopify)
+
+    Current.account.shops.create!(credentials: shopify.attributes.merge(auth.credentials))
+    redirect_to shops_path
+  end
 end
 ```
 
-Permit `attribute_names` and nothing else; unpermitted parameters raise
-`ActiveModel::ForbiddenAttributesError`. `Economic` and `Adversus` have fields
-and no sign-in: check `valid?` and store `strategy.attributes`.
+`authenticate_with_provider` puts the shop back on the strategy, so
+`shopify.attributes` is what was typed. Permit the attribute names and nothing
+else. `Economic` and `Adversus` have fields and no sign-in at all: check
+`valid?` and store `strategy.attributes`.
 
-## Refreshing
+### Store and refresh the credentials
+
+Store `auth.credentials` (encrypted), and renew it before each use:
 
 ```ruby
-credentials = strategy.refresh(credentials)   # renewed if about to expire, otherwise unchanged
+class Shop < ApplicationRecord
+  serialize :credentials, coder: JSON
+  encrypts :credentials
+
+  def access_token
+    renewed = strategy.refresh(credentials)
+    update!(credentials: renewed) if renewed != credentials
+    renewed["access_token"]
+  end
+
+  private
+
+  def strategy
+    AnyAuth.strategy(:shopify, shop: credentials["shop"])
+  end
+end
+```
+
+`refresh` asks the vendor only when the token runs out within two minutes, and
+keeps a refresh token the vendor did not replace. A vendor that rotates its
+refresh token, as Shopify does, must not be refreshed twice at once. How a
+vendor wants the token sent on an API call is on its
+[strategy page](docs/strategies).
+
+### One client per customer
+
+Options given to `AnyAuth.strategy` win over the configured ones, so a client
+can come from your database:
+
+```ruby
+config.provider :shopify, scope: "read_orders"
+
+AnyAuth.strategy(:shopify, client_id: tenant.client_id, client_secret: tenant.client_secret)
+```
+
+## Reference
+
+### Providers
+
+```ruby
+config.provider :google, client_id: -> { ENV["GOOGLE_CLIENT_ID"] }
+config.provider :google_drive, from: :google, scope: "https://www.googleapis.com/auth/drive.file"
+config.provider :google_workspace, strategy: :google, client_id: "…", client_secret: "…"
+
+AnyAuth.providers   # => ["google", "google_drive", "google_workspace"]
 ```
 
 | | |
 | --- | --- |
-| `expired?(credentials)` | the access token runs out within two minutes. Credentials are the string-keyed hash `auth.credentials` gave you, as JSON stores it |
-| `refresh(credentials)` | renews when expired; returns the whole hash either way |
-| `refresh!(credentials)` | asks the vendor now |
+| `from:` | another provider's strategy and options, here the same Google client asking for Drive |
+| `strategy:` | another provider's code only, with options of its own |
+| a callable value | asked each time a strategy is built |
+| `scope:` | replaces the strategy's default; OpenID Connect always adds `openid` |
 
-A vendor that rotates its refresh token, as Shopify does, must not be
-refreshed twice at once. Sending the token to the vendor's API is your
-client's job; each [strategy page](docs/strategies) says how the vendor wants
-it.
+Options sent to the vendor are declared per strategy (`scope` everywhere,
+`prompt` and `login_hint` for Google and Microsoft, and others on each
+strategy page). An unknown option raises `ActiveModel::UnknownAttributeError`
+when the strategy is built.
 
-## Errors
+### Controller helpers
+
+| | |
+| --- | --- |
+| `redirect_to_provider(strategy, redirect_uri:, params: {})` | keeps the sign-in in the session and redirects to the vendor |
+| `authenticate_with_provider(strategy)` | checks the callback, swaps the code and returns the `auth` |
+| `any_auth_params(strategy)` | the `params:` you passed, readable before the code is swapped and when the sign-in fails |
+
+The sign-in is kept for ten minutes and used once. One at a time: a second
+replaces the first.
+
+### What comes back
+
+| | |
+| --- | --- |
+| `auth.provider` | the name the provider is configured under |
+| `auth.uid` | who the vendor's token is for, as the vendor identifies them |
+| `auth.info` | `name`, `email`, `image`, nil where the vendor does not say; `email_verified`, false unless it vouches |
+| `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` (ISO 8601) when sent |
+| `auth.raw` | what the vendor said about who signed in: the ID token's claims, or its answer without the tokens |
+| `auth.params` | what you passed as `params:` |
+
+`uid` is a person, except at Shopify, whose tokens belong to a shop, and at
+Tavle, where it is one person in one company:
+
+| Strategy | `uid` | In `raw` |
+| --- | --- | --- |
+| Google | `sub` | `hd`, the Workspace domain |
+| Microsoft | `<tenant id>:<object id>` | `tid`, the tenant |
+| Apple | `sub` | `is_private_email` |
+| HubSpot | the user's id | `hub_id`, `hub_domain` |
+| Relatel | the employee's id | `company_id` |
+| Tavle | the membership's id | `company` |
+| Shopify | the shop's domain | the granted scope |
+
+### Errors
 
 | Error | Means |
 | --- | --- |
 | `InvalidCallback` | the callback is not ours: wrong state, no code, a bad signature, nothing under way |
-| `Declined` | the vendor sent `error=`; `code` holds it |
+| `Declined` | the person or the vendor said no (`error=` on the callback); `code` holds it |
 | `Unauthorized` | the vendor refused the code, the refresh or the ID token; `code` holds its reason, such as `invalid_grant` |
-| `Unavailable` | a timeout, a server error, an answer we cannot read |
-| `RateLimited` | an `Unavailable` asking us to slow down |
+| `Unavailable` | a timeout, a server error, an answer that cannot be read |
+| `RateLimited` | an `Unavailable` asking you to slow down |
 
 All are `AnyAuth::Error`. Mistakes in setup are ordinary Ruby errors: an
 unconfigured provider is a `KeyError`.
 
-## Strategies
+### Strategies
 
 | Strategy | Kind | |
 | --- | --- | --- |
-| [`Google`](docs/strategies/google.md) | OpenID Connect | |
+| [`Google`](docs/strategies/google.md) | OpenID Connect | sign-in and Google APIs |
 | [`Microsoft`](docs/strategies/microsoft.md) | OpenID Connect | work, school and personal accounts |
 | [`Apple`](docs/strategies/apple.md) | OpenID Connect | signed client secret; the callback is a `POST` you send on |
 | [`Hubspot`](docs/strategies/hubspot.md) | OAuth 2 | one more request, to name the user |
 | [`Relatel`](docs/strategies/relatel.md) | OAuth 2 | one more request, to name the employee |
-| [`Tavle`](docs/strategies/tavle.md) | OAuth 2 | one more request, to name the member; PKCE |
+| [`Tavle`](docs/strategies/tavle.md) | OAuth 2 | one more request, to name the member |
 | [`Shopify`](docs/strategies/shopify.md) | OAuth 2 with a field | per-shop endpoints, signed callback |
 | [`Economic`](docs/strategies/economic.md), [`Adversus`](docs/strategies/adversus.md) | fields only | |
 | [`Developer`](docs/strategies/developer.md) | a field | sign in as anyone; development only, loaded on request |
 
-A new OAuth 2 vendor is its endpoints:
+## Writing a strategy
+
+A new OAuth 2 vendor is its endpoints and one request to learn who signed in:
 
 ```ruby
 class Pipedrive < AnyAuth::Strategies::OAuth
   def client_options
-    { site: "https://oauth.pipedrive.com", authorize_url: "/oauth/authorize", token_url: "/oauth/token" }
+    { site: "https://api.pipedrive.com", authorize_url: "https://oauth.pipedrive.com/oauth/authorize",
+      token_url: "https://oauth.pipedrive.com/oauth/token" }
+  end
+
+  private
+
+  def identity(access_token, _session)
+    user = get(access_token, "/v1/users/me")["data"]
+    { uid: user["id"].to_s, info: AnyAuth::Info.new(name: user["name"], email: user["email"]) }
   end
 end
-
-config.provider :pipedrive, strategy: Pipedrive, client_id: "…", client_secret: "…"
 ```
 
-Override only the step that differs, calling `super`:
-
-| Step | For | Example |
-| --- | --- | --- |
-| `verify(params, session)` | a callback that needs more than its state | Shopify's signature |
-| `fetch_access_token(code, session)` | extra parameters on the code swap | Shopify's `expiring: 1` |
-| `identity(access_token, session)` | saying who signed in | `OpenIDConnect` |
-
-The client's id and secret are sent in the request body. A vendor that wants
-them another way says so in `client_options`, such as `auth_scheme: :basic_auth`.
-
-PKCE is a switch on every OAuth strategy: off for plain OAuth 2, on for
-`OpenIDConnect`. Turn it on for a vendor that accepts a `code_challenge`,
-in the class (`self.pkce = true`) or where it is configured (`pkce: true`).
-
-For sign-in, inherit from `OpenIDConnect` and answer `identity_from(claims)`
-with `{ uid:, info: }`, checking the issuer there.
+[Adding a strategy](docs/adding-a-strategy.md) covers OpenID Connect vendors,
+fields, PKCE, the steps you can override and how to test it.
+[How a sign-in works](docs/how-a-sign-in-works.md) says what is kept and
+checked along the way.
 
 ## Coming from OmniAuth
 
 | OmniAuth | AnyAuth |
 | --- | --- |
 | `provider :google_oauth2, id, secret` | `config.provider :google, client_id:, client_secret:` |
-| `/auth/:provider` and its callback | two routes and actions of your own |
+| `/auth/:provider` and its callback, by the middleware | two routes and actions of your own |
 | `request.env["omniauth.auth"]` | the return value of `authenticate_with_provider` |
 | `omniauth.params`, `omniauth.origin` | `params:`, read back as `auth.params` |
 | `/auth/failure` | `rescue_from AnyAuth::Error` |
@@ -264,25 +394,20 @@ stub_request(:post, "https://oauth2.googleapis.com/token").to_return(
 get auth_callback_path(:google, code: "code", state: sent["state"])
 ```
 
+For development, the [`Developer`](docs/strategies/developer.md) strategy signs
+in as any email without a vendor.
+
 ## Without the helpers
 
-```ruby
-request = strategy.request_phase(redirect_uri: "https://app.test/callback")
-request.url       # where to send the person
-request.session   # keep until they come back
-
-auth = strategy.callback_phase(query, kept)   # string-keyed hashes
-```
-
-Keeping `request.session` safe, for a limited time and one use, is then yours
-to do, as is giving the strategy its fields again in the callback.
+Outside a controller, call `request_phase` and `callback_phase` yourself; see
+[How a sign-in works](docs/how-a-sign-in-works.md#without-the-helpers).
 
 ## Limits
 
 - No SAML or OAuth 1. A callback that arrives as a cross-site `POST` is sent
   on to a `GET` by your app, as [Apple's](docs/strategies/apple.md) is.
-- Endpoints are written in the strategy; there is no discovery.
+- Endpoints are written in each strategy; there is no discovery.
 - The ID token is read from the token endpoint over TLS and checked for
-  audience, expiry, nonce and issuer. Its signature is not verified, which
+  issuer, audience, expiry and nonce. Its signature is not verified, which
   OpenID Connect allows for that path only.
 - `info` is a name, an email, whether it is vouched for, and a picture.
