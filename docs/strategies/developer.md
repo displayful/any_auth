@@ -28,12 +28,21 @@ needs no special case. `request_phase` sends the person straight to your own
 callback with the email in the address, and `callback_phase` reads it there:
 
 ```ruby
-developer = AnyAuth.strategy(:developer, email: params[:email])
+developer = AnyAuth.strategy(:developer, params.expect(strategy: [:email]))
 
-redirect_to_provider developer, redirect_uri: callback_url
+if developer.valid?
+  redirect_to_provider developer, redirect_uri: callback_url
+else
+  render :new, status: :unprocessable_content
+end
+
 # … and in the callback
 auth = authenticate_with_provider(AnyAuth.strategy(:developer))
 ```
+
+Ask for the email with a form for the strategy, as for
+[any strategy with fields](../../README.md#showing-the-form). A blank email is
+invalid, so the form comes back with the error.
 
 The callback still has to belong to a sign-in started in this browser, as with
 any vendor.

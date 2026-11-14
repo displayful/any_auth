@@ -38,6 +38,11 @@ module AnyAuth
         assert_predicate auth.info, :email_verified
       end
 
+      test 'a developer has to say who they are before leaving' do
+        assert_predicate Developer.new(email: 'mette@acme.test'), :valid?
+        assert_includes Developer.new.tap(&:valid?).errors.attribute_names, :email
+      end
+
       test 'a developer callback nobody started here, or naming nobody, is not a sign-in' do
         request = Developer.new.request_phase(redirect_uri: 'https://tavle.test/home')
         params = Rack::Utils.parse_query(URI(request.url).query)

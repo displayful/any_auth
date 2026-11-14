@@ -3,6 +3,8 @@ module AnyAuth
     class Developer < Base
       attribute :email, :string
 
+      validates :email, presence: true
+
       def request_phase(redirect_uri:, **)
         session = { 'state' => SecureRandom.hex(24) }
         home = URI(redirect_uri)
