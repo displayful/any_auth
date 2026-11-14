@@ -344,18 +344,8 @@ replaces the first.
 | `auth.raw` | what the vendor said about who signed in: the ID token's claims, or its answer without the tokens |
 | `auth.params` | what you passed as `params:` |
 
-`uid` is a person, except at Shopify, whose tokens belong to a shop, and at
-Tavle, where it is one person in one company:
-
-| Strategy | `uid` | In `raw` |
-| --- | --- | --- |
-| Google | `sub` | `hd`, the Workspace domain |
-| Microsoft | `<tenant id>:<object id>` | `tid`, the tenant |
-| Apple | `sub` | `is_private_email` |
-| HubSpot | the user's id | `hub_id`, `hub_domain` |
-| Relatel | the employee's id | `company_id` |
-| Tavle | the membership's id | `company` |
-| Shopify | the shop's domain | the granted scope |
+What `uid` is, and what each vendor puts in `raw`, is on its
+[strategy page](docs/strategies).
 
 ### Errors
 
@@ -422,8 +412,7 @@ checked along the way.
 | `extra.raw_info` | `auth.raw` |
 
 - Keep your provider names: `config.provider :google_oauth2, strategy: :google`.
-- Compare `uid`s before switching. Google's is the same `sub`; Microsoft's is
-  `<tenant id>:<object id>`.
+- Compare `uid`s before switching; each strategy page says what it is.
 - `auth` is an object: `auth.uid`, not `auth["uid"]`. `credentials` has
   `access_token` where OmniAuth has `token`, and `expires_at` as ISO 8601 text.
 
