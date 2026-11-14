@@ -62,6 +62,21 @@ module AnyAuth
         assert_raises(Unauthorized) { come_home }
       end
 
+      test 'a strategy that names no issuer is an error, not a sign-in' do
+        unchecked = Class.new(OpenIDConnect) do
+          def client_options
+            { site: 'https://oauth2.googleapis.com', token_url: '/token' }
+          end
+        end
+        stub_json(:post, TOKEN_URL, access_token: 'access', id_token: id_token(sub: 'g-1'))
+
+        strategy = unchecked.new(client_id: 'app', provider: 'unchecked')
+
+        assert_raises(NotImplementedError) do
+          strategy.callback_phase(callback_params, stored_session)
+        end
+      end
+
       private
 
       def google

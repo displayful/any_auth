@@ -28,6 +28,10 @@ module AnyAuth
         credentials
       end
 
+      def inspect
+        "#<#{self.class.name} provider=#{provider.inspect}>"
+      end
+
       private
 
       def secure_compare(expected, given)

@@ -54,6 +54,14 @@ module AnyAuth
         assert_not hubspot.expired?('expires_at' => 3.minutes.from_now.to_i)
       end
 
+      test 'expiry is read from a time, and from seconds written as text' do
+        assert hubspot.expired?('expires_at' => 1.minute.ago)
+        assert hubspot.expired?('expires_at' => 1.minute.ago.in_time_zone('Copenhagen'))
+        assert hubspot.expired?('expires_at' => 1.minute.ago.to_i.to_s)
+        assert_not hubspot.expired?('expires_at' => 1.hour.from_now)
+        assert_not hubspot.expired?('expires_at' => 1.hour.from_now.to_i.to_s)
+      end
+
       private
 
       def hubspot

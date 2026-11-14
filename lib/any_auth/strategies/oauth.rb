@@ -49,9 +49,7 @@ module AnyAuth
 
       def refresh!(credentials)
         credentials = credentials.to_h.stringify_keys
-        token = with_error_handling do
-          OAuth2::AccessToken.from_hash(client, credentials).refresh(parse: :json)
-        end
+        token = with_error_handling { OAuth2::AccessToken.from_hash(client, credentials).refresh }
 
         credentials.except('expires_at').merge(credentials_from(token))
       end
@@ -105,7 +103,9 @@ module AnyAuth
 
       def parse_time(value)
         case value
+        when Time then value
         when Numeric then Time.at(value)
+        when /\A\d+\z/ then Time.at(value.to_i)
         when String then value.to_time(:utc)
         end
       rescue ArgumentError
@@ -115,7 +115,6 @@ module AnyAuth
       def client
         OAuth2::Client.new(client_id, client_secret, client_options) do
           it.request :url_encoded
-          it.response :raise_error
         end
       end
 
@@ -129,15 +128,21 @@ module AnyAuth
       def with_error_handling
         yield
       rescue OAuth2::Error => e
-        raise Unauthorized, "#{provider} returned #{e.code || 'no token'}", cause: nil
+        raise vendor_error(e), cause: nil
       rescue Faraday::Error, JSON::ParserError => e
-        error_class = error_class_for(e.try(:response_status))
-        raise error_class, "#{provider} request failed (#{e.class.name.demodulize})", cause: nil
+        raise Unavailable, "#{provider} request failed (#{e.class.name.demodulize})", cause: nil
+      end
+
+      def vendor_error(error)
+        status = error.response.try(:status)
+        message = "#{provider} returned #{error.code || status || 'no token'}"
+
+        error_class_for(status).new(message, code: error.code)
       end
 
       def error_class_for(status)
         case status
-        when 400, 401, 403 then Unauthorized
+        when nil, 400, 401, 403 then Unauthorized
         when 429 then RateLimited
         else Unavailable
         end

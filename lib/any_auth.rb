@@ -17,18 +17,23 @@ require 'jwt'
 require 'oauth2'
 
 module AnyAuth
-  Error = Class.new(StandardError)
+  class Error < StandardError
+    attr_reader :code
+
+    def initialize(message = nil, code: nil)
+      @code = code
+      super(message)
+    end
+  end
+
   InvalidCallback = Class.new(Error)
   Unauthorized = Class.new(Error)
   Unavailable = Class.new(Error)
   RateLimited = Class.new(Unavailable)
 
   class Declined < Error
-    attr_reader :code
-
     def initialize(code)
-      @code = code
-      super("The provider answered the sign-in with #{code}")
+      super("Sign-in declined (#{code})", code:)
     end
   end
 

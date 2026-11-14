@@ -17,8 +17,6 @@ module AnyAuth
       private
 
       def identity_from(claims)
-        raise Unauthorized, 'Invalid issuer' unless issued_by_its_tenant?(claims)
-
         { uid: "#{claims['tid']}:#{fetch_claim(claims, 'oid')}", info: info_from(claims) }
       end
 
@@ -30,7 +28,7 @@ module AnyAuth
         )
       end
 
-      def issued_by_its_tenant?(claims)
+      def valid_issuer?(claims)
         tenant = claims['tid'].to_s
 
         tenant.match?(/\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/) &&

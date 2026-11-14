@@ -11,8 +11,9 @@ module ActiveSupport
   class TestCase
     CALLBACK_URL = 'https://tavle.test/callback'
 
-    def stub_json(method, url, **body)
+    def stub_json(method, url, status: 200, **body)
       stub_request(method, url).to_return(
+        status:,
         headers: { 'Content-Type' => 'application/json' },
         body: body.to_json
       )

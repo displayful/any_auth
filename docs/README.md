@@ -25,7 +25,8 @@ back, and what is unusual about it.
 
 - **OAuth 2** strategies send the person to the vendor and come back with
   credentials. `auth.uid` is who signed in; which account that opened is in
-  `auth.raw`. They send a PKCE challenge when configured with `pkce: true`.
+  `auth.raw`. They send a PKCE challenge when the strategy switches it on, as
+  Relatel and Tavle do, or when configured with `pkce: true`.
 - **OpenID Connect** strategies are OAuth 2 plus an answer to who signed in.
   They always ask for `openid`, send a nonce and (except to Apple) a PKCE challenge, and read
   `auth.uid` and `auth.info` from the ID token.

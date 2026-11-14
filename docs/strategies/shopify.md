@@ -25,8 +25,9 @@ Whatever the person types is turned into the shop's `myshopify.com` address:
 
 `valid?` accepts only `<name>.myshopify.com`. It does not ask Shopify whether
 the shop exists; a shop that does not exist answers 404 on its sign-in address.
-Every phase raises `ArgumentError` on a shop that is not valid, so a forgotten
-`valid?` cannot send anyone to another host.
+Leaving raises `ArgumentError` on a shop that is not valid, so a forgotten
+`valid?` cannot send anyone to another host. A callback for such a shop is an
+`InvalidCallback`.
 
 See [the README](../../README.md#fields) for the
 form and the controller: the shop has to travel with the request, because the

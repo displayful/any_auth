@@ -26,7 +26,7 @@ Register a connected app with your callback address as its redirect URI.
 | `auth.uid` | the `sub` from `/oauth/userinfo`: the **membership**, one person in one company |
 | `auth.info.name` | their name |
 | `auth.info.email` | their address |
-| `auth.info.email_verified` | true: a Tavle address is one somebody has clicked a link at |
+| `auth.info.email_verified` | what Tavle says, which is true: an address there is one somebody has clicked a link at |
 | `auth.credentials` | `access_token`, `refresh_token`, `expires_at` (two hours) |
 | `auth.raw` | the userinfo answer, including `company` with its `id` and `name` |
 

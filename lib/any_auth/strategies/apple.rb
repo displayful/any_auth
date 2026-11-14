@@ -43,9 +43,11 @@ module AnyAuth
       private
 
       def identity_from(claims)
-        raise Unauthorized, 'Invalid issuer' unless claims['iss'] == ISSUER
-
         { uid: fetch_claim(claims, 'sub'), info: info_from(claims) }
+      end
+
+      def valid_issuer?(claims)
+        claims['iss'] == ISSUER
       end
 
       def info_from(claims)

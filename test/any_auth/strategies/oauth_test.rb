@@ -55,6 +55,25 @@ module AnyAuth
         assert_raises(Unauthorized) { hubspot.callback_phase(callback_params, stored_session) }
       end
 
+      test "a refusal carries the vendor's reason" do
+        stub_json(:post, TOKEN_URL, status: 400, error: 'invalid_grant')
+
+        refused = assert_raises(Unauthorized) do
+          hubspot.callback_phase(callback_params, stored_session)
+        end
+
+        assert_equal 'invalid_grant', refused.code
+      end
+
+      test 'inspecting a strategy, or what came back, shows no secret and no token' do
+        stub_json(:post, TOKEN_URL, access_token: 'new')
+
+        auth = hubspot.callback_phase(callback_params, stored_session)
+
+        assert_not_includes hubspot.inspect, 'secret'
+        assert_not_includes auth.inspect, 'new'
+      end
+
       test 'a vendor that is down or silent is Unavailable' do
         stub_request(:post, TOKEN_URL).to_return(status: 503)
 

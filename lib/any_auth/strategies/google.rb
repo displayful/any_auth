@@ -17,8 +17,6 @@ module AnyAuth
       private
 
       def identity_from(claims)
-        raise Unauthorized, 'Invalid issuer' unless issued_by_google?(claims)
-
         { uid: fetch_claim(claims, 'sub'), info: info_from(claims) }
       end
 
@@ -31,7 +29,7 @@ module AnyAuth
         )
       end
 
-      def issued_by_google?(claims)
+      def valid_issuer?(claims)
         claims['iss'].in?(%w[https://accounts.google.com accounts.google.com])
       end
 

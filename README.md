@@ -67,13 +67,14 @@ auth.params[:return_to]   # "/boards"
 | --- | --- |
 | `auth.provider` | the name the provider is configured under |
 | `auth.uid` | who signed in, as the vendor identifies them |
-| `auth.info` | `name`, `email`, `email_verified`, `image`; nil where the vendor does not say |
+| `auth.info` | `name`, `email`, `image`, nil where the vendor does not say; `email_verified`, false unless it vouches |
 | `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` when sent |
-| `auth.raw` | what the vendor said, untouched |
+| `auth.raw` | what the vendor said about who signed in: the ID token's claims, or its answer without the tokens |
 | `auth.params` | what you passed as `params:` |
 
-`uid` is the person, never the account they opened. A vendor with tenants
-names the tenant in `raw`:
+`uid` is who the vendor's token is for. That is a person, except at Shopify,
+whose tokens belong to a shop, and Tavle, where it is one person in one
+company. A vendor with tenants names the tenant in `raw`:
 
 | Strategy | `uid` | In `raw` |
 | --- | --- | --- |
@@ -81,6 +82,7 @@ names the tenant in `raw`:
 | Microsoft | `<tenant id>:<object id>` | `tid`, the tenant |
 | HubSpot | the user's id | `hub_id`, `hub_domain` |
 | Relatel | the employee's id | `company_id` |
+| Tavle | the membership's id | `company` |
 | Shopify | the shop's domain | the granted scope |
 
 Key a person on `provider` and `uid`. Link an existing account by email only
@@ -177,7 +179,7 @@ it.
 | --- | --- |
 | `InvalidCallback` | the callback is not ours: wrong state, no code, a bad signature, nothing under way |
 | `Declined` | the vendor sent `error=`; `code` holds it |
-| `Unauthorized` | the vendor refused the code, the refresh or the ID token |
+| `Unauthorized` | the vendor refused the code, the refresh or the ID token; `code` holds its reason, such as `invalid_grant` |
 | `Unavailable` | a timeout, a server error, an answer we cannot read |
 | `RateLimited` | an `Unavailable` asking us to slow down |
 

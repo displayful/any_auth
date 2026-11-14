@@ -35,7 +35,12 @@ module AnyAuth
       end
 
       def valid_claims?(claims, session)
-        valid_audience?(claims) && unexpired?(claims) && valid_nonce?(claims, session)
+        valid_issuer?(claims) && valid_audience?(claims) && unexpired?(claims) &&
+          valid_nonce?(claims, session)
+      end
+
+      def valid_issuer?(_claims)
+        raise NotImplementedError, "#{self.class.name} must define valid_issuer?(claims)"
       end
 
       def valid_audience?(claims)

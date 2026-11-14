@@ -10,7 +10,7 @@ config.provider :microsoft, client_id: ENV["MICROSOFT_CLIENT_ID"], client_secret
 
 # Microsoft's code with another client and other scopes
 config.provider :power_bi, strategy: :microsoft, client_id: "…", client_secret: "…",
-  scope: "offline_access https://analysis.windows.net/powerbi/api/Report.Read.All"
+  scope: "profile offline_access https://analysis.windows.net/powerbi/api/Report.Read.All"
 ```
 
 | Option | Sent to Microsoft | Notes |

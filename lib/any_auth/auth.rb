@@ -5,5 +5,9 @@ module AnyAuth
     def initialize(provider:, credentials:, uid: nil, info: Info.new, raw: {}, params: {})
       super
     end
+
+    def inspect
+      "#<data #{self.class.name} provider=#{provider.inspect}, uid=#{uid.inspect}>"
+    end
   end
 end
