@@ -308,8 +308,8 @@ configure, what the vendor needs, what comes back and what is unusual.
 | [`Developer`](docs/strategies/developer.md) | fields only | type an email and be that person; for development only |
 
 Register `Developer` only where it is safe, for example
-`config.provider :developer if Rails.env.development?`. It has no round trip:
-give it an email and call `callback_phase`.
+`config.provider :developer if Rails.env.development?`. It goes through the
+same two phases as the others, coming straight back to your callback.
 
 ## Writing a strategy
 

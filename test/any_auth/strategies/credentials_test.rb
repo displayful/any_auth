@@ -34,13 +34,28 @@ module AnyAuth
         assert_equal 'igen', fresh['refresh_token']
       end
 
-      test 'a developer is whoever they say they are' do
-        auth = Developer.new(email: ' Mette@Acme.test ').callback_phase
+      test 'a developer comes straight home as whoever they say they are' do
+        request = Developer.new(email: ' Mette@Acme.test ').request_phase(redirect_uri: 'https://tavle.test/home')
+        home = URI(request.url)
+        params = Rack::Utils.parse_query(home.query)
 
+        auth = Developer.new.callback_phase(params, request.session)
+
+        assert_equal 'tavle.test', home.host
         assert_equal 'developer', auth.provider
         assert_equal 'mette@acme.test', auth.uid
         assert_predicate auth.info, :email_verified
-        assert_raises(InvalidCallback) { Developer.new.callback_phase }
+      end
+
+      test 'a developer callback nobody started here, or naming nobody, is not a sign-in' do
+        request = Developer.new.request_phase(redirect_uri: 'https://tavle.test/home')
+        params = Rack::Utils.parse_query(URI(request.url).query)
+
+        assert_raises(InvalidCallback) { Developer.new.callback_phase(params, request.session) }
+        assert_raises(InvalidCallback) { Developer.new.callback_phase(params.merge('email' => 'a@b.test'), nil) }
+        assert_raises(InvalidCallback) do
+          Developer.new.callback_phase({ 'email' => 'a@b.test', 'state' => 'forged' }, request.session)
+        end
       end
 
       private

@@ -23,24 +23,20 @@ not exist.
 
 ## Using it
 
-There is no `request_phase`. Give it an email and call `callback_phase` with
-no arguments:
+It goes through the same two phases as every other strategy, so a controller
+needs no special case. `request_phase` sends the person straight to your own
+callback with the email in the address, and `callback_phase` reads it there:
 
 ```ruby
 developer = AnyAuth.strategy(:developer, email: params[:email])
-auth = developer.callback_phase
+
+redirect_to_provider developer, redirect_uri: callback_url
+# … and in the callback
+auth = authenticate_with_provider(AnyAuth.strategy(:developer))
 ```
 
-A controller that serves both kinds can branch on that:
-
-```ruby
-if strategy.respond_to?(:request_phase)
-  redirect_to_provider strategy, redirect_uri: callback_url
-else
-  strategy.email = params[:email]
-  sign_in_as strategy.callback_phase
-end
-```
+The callback still has to belong to a sign-in started in this browser, as with
+any vendor.
 
 ## What comes back
 
@@ -56,4 +52,4 @@ Because `email_verified` is always true, an app that links accounts by
 verified email will sign you in as any existing person. That is the point,
 and the reason it must stay out of production.
 
-A missing email is an `AnyAuth::InvalidCallback`.
+A missing email, or a callback nobody started, is an `AnyAuth::InvalidCallback`.
