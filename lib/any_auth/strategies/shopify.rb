@@ -50,7 +50,7 @@ module AnyAuth
         OpenSSL::HMAC.hexdigest('SHA256', client_secret, message)
       end
 
-      def exchange(code, session)
+      def fetch_access_token(code, session)
         super(code, session, expiring: 1)
       end
 

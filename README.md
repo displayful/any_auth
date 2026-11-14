@@ -217,7 +217,7 @@ Override only the step that differs, calling `super`:
 | Step | For | Example |
 | --- | --- | --- |
 | `verify(params, session)` | a callback that needs more than its state | Shopify's signature |
-| `exchange(code, session)` | extra parameters on the code swap | Shopify's `expiring: 1` |
+| `fetch_access_token(code, session)` | extra parameters on the code swap | Shopify's `expiring: 1` |
 | `identity(access_token, session)` | saying who signed in | `OpenIDConnect` |
 
 The client's id and secret are sent in the request body. A vendor that wants

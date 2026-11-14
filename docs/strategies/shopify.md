@@ -43,7 +43,7 @@ URL, and list the scopes you ask for.
 | Step | What Shopify adds |
 | --- | --- |
 | `verify` | the callback must name the shop the person left for, and carry Shopify's HMAC of its parameters, made with your client secret. Otherwise it is an `AnyAuth::InvalidCallback` |
-| `exchange` | asks for an expiring offline token (`expiring: 1`), so a refresh token comes back |
+| `fetch_access_token` | asks for an expiring offline token (`expiring: 1`), so a refresh token comes back |
 
 Shopify replaces the refresh token every time it is used. Two processes
 refreshing at once will leave one of them with a dead token, so check

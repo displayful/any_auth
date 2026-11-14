@@ -32,7 +32,7 @@ module AnyAuth
 
       def callback_phase(params, session)
         verify(params, session)
-        access_token = exchange(params['code'], session)
+        access_token = fetch_access_token(params['code'], session)
         credentials = credentials_from(access_token)
 
         Auth.new(provider:, credentials:, **identity(access_token, session))
@@ -75,7 +75,7 @@ module AnyAuth
         secure_compare(session['state'], params['state'])
       end
 
-      def exchange(code, session, **params)
+      def fetch_access_token(code, session, **params)
         params = params.merge(
           redirect_uri: session['redirect_uri'],
           code_verifier: session['code_verifier'],
