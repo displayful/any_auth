@@ -2,6 +2,7 @@ module AnyAuth
   module Strategies
     class OAuth < Base
       class_attribute :authorize_options, default: [], instance_writer: false
+      class_attribute :pkce, default: false
 
       attr_accessor :client_id, :client_secret
 
@@ -13,10 +14,11 @@ module AnyAuth
       authorize_option :scope
 
       def request_phase(redirect_uri:, **params)
-        state = SecureRandom.hex(24)
-        url = client.auth_code.authorize_url(**authorize_params, **params, redirect_uri:, state:)
+        session = { 'state' => SecureRandom.hex(24), 'redirect_uri' => redirect_uri }
+        params = params.merge(pkce_params(session)) if pkce?
+        url = client.auth_code.authorize_url(**authorize_params, **params, redirect_uri:, state: session['state'])
 
-        Request.new(url:, session: { 'state' => state, 'redirect_uri' => redirect_uri })
+        Request.new(url:, session:)
       end
 
       def callback_phase(params, session)
@@ -57,8 +59,17 @@ module AnyAuth
         raise InvalidCallback, "#{provider} sent back no code" if params['code'].blank?
       end
 
+      def pkce_params(session)
+        pair = PKCE.pair
+        session['code_verifier'] = pair.verifier
+
+        { code_challenge: pair.challenge, code_challenge_method: 'S256' }
+      end
+
       def exchange(code, session, **params)
-        asking_the_vendor { client.auth_code.get_token(code, { redirect_uri: session['redirect_uri'], **params }) }
+        params = { redirect_uri: session['redirect_uri'], code_verifier: session['code_verifier'], **params }.compact
+
+        asking_the_vendor { client.auth_code.get_token(code, params) }
       end
 
       def identity(_token, _session)

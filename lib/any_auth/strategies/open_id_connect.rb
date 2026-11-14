@@ -1,23 +1,19 @@
 module AnyAuth
   module Strategies
     class OpenIDConnect < OAuth
+      self.pkce = true
+
       def request_phase(redirect_uri:, scope: self.scope || 'email profile', **params)
         nonce = SecureRandom.hex(16)
-        pkce = PKCE.pair
-        request = super(redirect_uri:, **params, scope: with_openid(scope), nonce:,
-          code_challenge: pkce.challenge, code_challenge_method: 'S256')
+        request = super(redirect_uri:, **params, scope: with_openid(scope), nonce:)
 
-        request.with(session: request.session.merge('nonce' => nonce, 'code_verifier' => pkce.verifier))
+        request.with(session: request.session.merge('nonce' => nonce))
       end
 
       private
 
       def with_openid(scope)
         ['openid', *scope.split].uniq.join(' ')
-      end
-
-      def exchange(code, session)
-        super(code, session, code_verifier: session['code_verifier'])
       end
 
       def identity(token, session)

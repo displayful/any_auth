@@ -216,6 +216,11 @@ Override only the step that differs, calling `super`:
 | `verify(params, session)` | a callback that needs more than its state | Shopify's signature |
 | `exchange(code, session)` | extra parameters on the code swap | Shopify's `expiring: 1` |
 | `identity(token, session)` | saying who signed in | `OpenIDConnect` |
+
+PKCE is a switch on every OAuth strategy: off for plain OAuth 2, on for
+`OpenIDConnect`. Turn it on for a vendor that accepts a `code_challenge`,
+in the class (`self.pkce = true`) or where it is configured (`pkce: true`).
+
 For sign-in, inherit from `OpenIDConnect` and answer `identity_from(claims)`
 with `{ uid:, info: }`, checking the issuer there.
 

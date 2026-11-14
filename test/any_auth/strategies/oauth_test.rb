@@ -61,6 +61,27 @@ module AnyAuth
         assert_raises(RateLimited) { hubspot.refresh!('refresh_token' => 'igen') }
       end
 
+      test 'no challenge is sent unless PKCE is switched on' do
+        request = hubspot.request_phase(redirect_uri: 'https://tavle.test/callback')
+
+        assert_nil query_of(request.url)['code_challenge']
+        assert_nil request.session['code_verifier']
+      end
+
+      test 'with PKCE switched on, leaving sends a challenge and the swap sends its verifier' do
+        stub_json(:post, TOKEN_URL, access_token: 'ny')
+        hubspot = Hubspot.new(client_id: 'app', client_secret: 'tys', pkce: true)
+        request = hubspot.request_phase(redirect_uri: 'https://tavle.test/callback')
+        sent = query_of(request.url)
+
+        hubspot.callback_phase({ 'code' => 'kode', 'state' => sent['state'] }, request.session)
+
+        assert_equal 'S256', sent['code_challenge_method']
+        assert_equal Base64.urlsafe_encode64(Digest::SHA256.digest(request.session['code_verifier']), padding: false),
+          sent['code_challenge']
+        assert_requested :post, TOKEN_URL, body: hash_including('code_verifier' => request.session['code_verifier'])
+      end
+
       private
 
       def hubspot
