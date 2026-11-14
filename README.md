@@ -199,6 +199,25 @@ shopify.valid?   # false, with errors on :shop, for anything that is not a shop
 shopify.shop     # "mystore.myshopify.com"
 ```
 
+### Where the fields are
+
+They are ordinary attributes, so each step is a call you already know:
+
+```ruby
+AnyAuth.strategy_class(:shopify).attribute_names   # => ["shop"]   what to ask for
+AnyAuth.strategy_class(:shopify).fields?           # => true       whether to ask at all
+
+strategy = AnyAuth.strategy(:shopify, params.expect(strategy: [:shop]))   # what was typed
+strategy.shop          # => "mystore.myshopify.com"                       one of them
+strategy.attributes    # => { "shop" => "mystore.myshopify.com" }         all of them, to store
+```
+
+`AnyAuth.strategy` takes attributes the way `Model.new` does: a hash, or
+permitted parameters straight from the controller. Parameters that were not
+permitted raise `ActiveModel::ForbiddenAttributesError`, so a posted
+`client_secret` can never reach the strategy by accident. Permit
+`attribute_names` and nothing else.
+
 ### Showing the form
 
 It is a form for a model, like any other. Give it a `scope`, so the parameters
@@ -233,7 +252,7 @@ class ShopsController < ApplicationController
   end
 
   def create
-    @strategy = AnyAuth.strategy(:shopify, **fields)
+    @strategy = AnyAuth.strategy(:shopify, fields)
 
     if @strategy.valid?
       redirect_to_provider @strategy, redirect_uri: callback_shops_url, fields: @strategy.attributes
@@ -244,7 +263,7 @@ class ShopsController < ApplicationController
 
   def callback
     stored  = take_auth_request(:shopify)
-    shopify = AnyAuth.strategy(:shopify, **stored.to_h.fetch("fields", {}).symbolize_keys)
+    shopify = AnyAuth.strategy(:shopify, stored.to_h.fetch("fields", {}))
     auth    = shopify.callback_phase(request.query_parameters, stored&.fetch("request"))
 
     current_account.shops.create!(credentials: shopify.attributes.merge(auth.credentials))
@@ -253,7 +272,7 @@ class ShopsController < ApplicationController
   private
 
   def fields
-    params.expect(strategy: AnyAuth.strategy_class(:shopify).attribute_names).to_h.symbolize_keys
+    params.expect(strategy: AnyAuth.strategy_class(:shopify).attribute_names)
   end
 end
 ```

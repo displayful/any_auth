@@ -23,16 +23,21 @@ module AnyAuth
       named.is_a?(Class) ? named : Strategies.const_get(named.to_s.underscore.camelize, false)
     end
 
-    def strategy(name, **overrides)
-      options = options_for(name).merge(overrides).transform_values { it.respond_to?(:call) ? it.call : it }
-
-      strategy_class(name).new(**options, provider: name.to_s)
+    def strategy(name, attributes = {})
+      strategy_class(name).new(defaults_for(name)).tap do |strategy|
+        strategy.assign_attributes(attributes)
+        strategy.provider = name.to_s
+      end
     end
 
     private
 
     def entry_for(name)
       @entries.fetch(name.to_s)
+    end
+
+    def defaults_for(name)
+      options_for(name).transform_values { it.respond_to?(:call) ? it.call : it }
     end
 
     def options_for(name)

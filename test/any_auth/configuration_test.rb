@@ -1,4 +1,5 @@
 require 'test_helper'
+require 'action_controller'
 
 module AnyAuth
   class ConfigurationTest < ActiveSupport::TestCase
@@ -50,6 +51,17 @@ module AnyAuth
       @config.provider :shopify, scope: 'read_orders'
 
       assert_equal 'mystore.myshopify.com', @config.strategy(:shopify, shop: 'mystore').shop
+    end
+
+    test 'fields come straight from permitted parameters, and only from permitted ones' do
+      @config.provider :shopify, scope: 'read_orders'
+      posted = ActionController::Parameters.new(strategy: { shop: 'mystore', client_secret: 'theirs' })
+
+      shopify = @config.strategy(:shopify, posted.expect(strategy: %i[shop]))
+
+      assert_equal 'mystore.myshopify.com', shopify.shop
+      assert_nil shopify.client_secret
+      assert_raises(ActiveModel::ForbiddenAttributesError) { @config.strategy(:shopify, posted[:strategy]) }
     end
 
     test 'a name nobody configured is an error, and is not listed' do

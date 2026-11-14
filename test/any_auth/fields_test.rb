@@ -21,7 +21,7 @@ module AnyAuth
       end
 
       def create
-        @strategy = strategy(**params.expect(strategy: %i[shop]).to_h.symbolize_keys)
+        @strategy = strategy(params.expect(strategy: %i[shop]))
 
         if @strategy.valid?
           redirect_to_provider @strategy, redirect_uri: 'https://tavle.test/shops/callback',
@@ -33,7 +33,7 @@ module AnyAuth
 
       def callback
         stored = take_auth_request(:shopify)
-        shopify = strategy(**stored.to_h.fetch('fields', {}).symbolize_keys)
+        shopify = strategy(stored.to_h.fetch('fields', {}))
         auth = shopify.callback_phase(request.query_parameters, stored&.fetch('request'))
 
         render json: shopify.attributes.merge(auth.credentials)
@@ -41,8 +41,8 @@ module AnyAuth
 
       private
 
-      def strategy(**fields)
-        Strategies::Shopify.new(client_id: 'app', client_secret: 'hush', **fields)
+      def strategy(fields = {})
+        Strategies::Shopify.new(client_id: 'app', client_secret: 'hush').tap { it.assign_attributes(fields) }
       end
     end
 

@@ -26,7 +26,7 @@ are secrets.
 accepts them, call its API once before saving:
 
 ```ruby
-strategy = AnyAuth.strategy("e-conomic", **fields)
+strategy = AnyAuth.strategy("e-conomic", fields)
 Faraday.get("https://restapi.e-conomic.com/self", nil,
   "X-AppSecretToken" => strategy.app_token, "X-AgreementGrantToken" => strategy.agreement_token)
 ```

@@ -46,8 +46,8 @@ module AnyAuth
     configuration.strategy_class(name)
   end
 
-  def self.strategy(name, **)
-    configuration.strategy(name, **)
+  def self.strategy(...)
+    configuration.strategy(...)
   end
 end
 
