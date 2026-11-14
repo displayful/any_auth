@@ -1,20 +1,8 @@
 require 'test_helper'
-require 'rails'
-require 'action_controller/railtie'
+require 'test_app'
 
 module AnyAuth
   class ControllerHelpersTest < ActionDispatch::IntegrationTest
-    class App < Rails::Application
-      config.root = __dir__
-      config.eager_load = false
-      config.secret_key_base = 'hemmelig' * 8
-      config.hosts.clear
-      config.logger = Logger.new(nil)
-      config.action_controller.allow_forgery_protection = false
-    end
-
-    App.initialize!
-
     class SignInsController < ActionController::Base
       include ControllerHelpers
 
@@ -36,14 +24,6 @@ module AnyAuth
 
       def strategy
         Strategies.const_get(params[:provider].camelize, false).new(client_id: 'app', client_secret: 'tys')
-      end
-    end
-
-    App.routes.draw do
-      scope ':provider', controller: 'any_auth/controller_helpers_test/sign_ins' do
-        post 'leave', action: :create
-        get 'home', action: :show
-        get 'stored', action: :stored
       end
     end
 
@@ -97,7 +77,7 @@ module AnyAuth
     private
 
     def app
-      App
+      TestApp
     end
   end
 end

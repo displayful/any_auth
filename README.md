@@ -195,15 +195,80 @@ A strategy is an ActiveModel, and its attributes are the fields a person
 types. Shopify needs the shop before it can build an address:
 
 ```ruby
-shopify = AnyAuth::Strategies::Shopify.new(client_id:, client_secret:, shop: "mystore")
+shopify = AnyAuth.strategy(:shopify, shop: "mystore")
 shopify.valid?   # false, with errors on :shop, for anything that is not a shop
 shopify.shop     # "mystore.myshopify.com"
 ```
 
-Render its attributes with `fields_for`, as you would any model. Some vendors
-have fields and no round trip at all, such as an API token pasted from their
-settings page. Those inherit from `Base`, and what you store is
-`strategy.attributes`.
+### Showing the form
+
+It is a form for a model, like any other. Give it a `scope`, so the parameters
+do not carry the strategy's class name:
+
+```erb
+<%= form_with model: @strategy, scope: :strategy, url: shops_path do |form| %>
+  <%= form.label :shop %>
+  <%= form.text_field :shop %>
+  <%= tag.p @strategy.errors.full_messages_for(:shop).to_sentence %>
+  <%= form.submit "Connect" %>
+<% end %>
+```
+
+`strategy.class.attribute_names` lists the fields, and
+`strategy.class.fields?` says whether there are any, for a page that draws
+whichever vendor it is given. The gem does not know which fields are secret;
+choose `password_field` for those in your own view.
+
+### Fields, then a round trip
+
+Validate, then leave. The fields have to come back with the person, because
+the callback needs the same strategy: store them with the request, and build
+the strategy from them again.
+
+```ruby
+class ShopsController < ApplicationController
+  include AnyAuth::ControllerHelpers
+
+  def new
+    @strategy = AnyAuth.strategy(:shopify)
+  end
+
+  def create
+    @strategy = AnyAuth.strategy(:shopify, **fields)
+
+    if @strategy.valid?
+      redirect_to_provider @strategy, redirect_uri: callback_shops_url, fields: @strategy.attributes
+    else
+      render :new, status: :unprocessable_content
+    end
+  end
+
+  def callback
+    stored  = take_auth_request(:shopify)
+    shopify = AnyAuth.strategy(:shopify, **stored.to_h.fetch("fields", {}).symbolize_keys)
+    auth    = shopify.callback_phase(request.query_parameters, stored&.fetch("request"))
+
+    current_account.shops.create!(credentials: shopify.attributes.merge(auth.credentials))
+  end
+
+  private
+
+  def fields
+    params.expect(strategy: AnyAuth.strategy_class(:shopify).attribute_names).to_h.symbolize_keys
+  end
+end
+```
+
+What you store is the fields and the tokens together. Building the strategy
+from that hash later gives you both `shopify.shop` and working credentials.
+
+### Fields and no round trip
+
+Some vendors have you paste a token or a login from their settings page.
+Those strategies inherit from `Base`. Show the same form, check `valid?`, and
+store `strategy.attributes`. To find out whether the vendor accepts what was
+typed, call its API once with `strategy.authorization(strategy.attributes)`
+before you save.
 
 ## What comes back
 
