@@ -5,31 +5,37 @@ module AnyAuth
 
       validates :shop, format: { with: /\A[a-z0-9][a-z0-9-]*\.myshopify\.com\z/, message: :invalid }
 
-      def shop=(value)
-        typed = value.to_s.strip.downcase.sub(%r{\Ahttps?://}, '')
-        name = typed[%r{\Aadmin\.shopify\.com/store/([^/]+)}, 1] || typed.split('/').first.to_s
-        name = "#{name}.myshopify.com" if name.present? && name.exclude?('.')
-
-        super(name.presence)
+      def shop=(typed)
+        super(shop_domain_in(typed))
       end
 
       def client_options
         {
-          site: "https://#{shop}",
+          site: URI::HTTPS.build(host: shop).to_s,
           authorize_url: '/admin/oauth/authorize',
-          token_url: "https://#{shop}/admin/oauth/access_token",
+          token_url: '/admin/oauth/access_token',
           auth_scheme: :request_body,
         }
       end
 
       private
 
+      def shop_domain_in(typed)
+        address = typed.to_s.strip.downcase.delete_prefix('https://').delete_prefix('http://')
+        name = address[%r{\Aadmin\.shopify\.com/store/([^/]+)}, 1] || address.split('/').first
+        return if name.blank?
+
+        name.include?('.') ? name : "#{name}.myshopify.com"
+      end
+
       def verify(params, session)
         super
-        return if client_secret.present? && shop.present? && params['shop'] == shop &&
-                  ActiveSupport::SecurityUtils.secure_compare(signature_of(params), params['hmac'].to_s)
+        raise InvalidCallback, 'The callback is for another shop' unless shop.present? && params['shop'] == shop
+        raise InvalidCallback, 'The callback is not signed by Shopify' unless signed_by_shopify?(params)
+      end
 
-        raise InvalidCallback, "The callback is not signed by Shopify for #{shop}"
+      def signed_by_shopify?(params)
+        client_secret.present? && same?(signature_of(params), params['hmac'])
       end
 
       def exchange(code, session)

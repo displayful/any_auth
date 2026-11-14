@@ -15,15 +15,21 @@ module AnyAuth
       private
 
       def identity_from(claims)
-        unless claims['iss'].in?(%w[https://accounts.google.com accounts.google.com])
-          raise Unauthorized, 'The ID token was not issued by Google'
-        end
+        raise Unauthorized, 'The ID token was not issued by Google' unless issued_by_google?(claims)
 
-        address = claims['email'].to_s.downcase
-        vouched = claims['email_verified'] == true &&
-                  (address.end_with?('@gmail.com', '@googlemail.com') || claims['hd'].present?)
+        { uid: required(claims, 'sub'), info: Info.new(email: claims['email'], email_verified: vouched_for?(claims)) }
+      end
 
-        { uid: required(claims, 'sub'), info: Info.new(email: claims['email'], email_verified: vouched) }
+      def issued_by_google?(claims)
+        claims['iss'].in?(%w[https://accounts.google.com accounts.google.com])
+      end
+
+      def vouched_for?(claims)
+        claims['email_verified'] == true && hosted_by_google?(claims)
+      end
+
+      def hosted_by_google?(claims)
+        claims['hd'].present? || claims['email'].to_s.downcase.end_with?('@gmail.com', '@googlemail.com')
       end
     end
   end

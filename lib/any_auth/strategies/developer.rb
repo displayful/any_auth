@@ -5,17 +5,16 @@ module AnyAuth
 
       def request_phase(redirect_uri:, **)
         session = { 'state' => SecureRandom.hex(24) }
+        home = URI(redirect_uri)
+        home.query = { email:, state: session['state'] }.to_query
 
-        Request.new(url: "#{redirect_uri}?#{{ email:, state: session['state'] }.to_query}", session:)
+        Request.new(url: home.to_s, session:)
       end
 
       def callback_phase(params, session)
-        state = session.to_h['state']
         address = params['email'].to_s.strip.downcase
 
-        unless state.present? && ActiveSupport::SecurityUtils.secure_compare(state, params['state'].to_s)
-          raise InvalidCallback, 'No developer sign-in is under way'
-        end
+        raise InvalidCallback, 'No developer sign-in is under way' unless same?(session.to_h['state'], params['state'])
         raise InvalidCallback, 'The developer sign-in needs an email' if address.blank?
 
         Auth.new(provider:, uid: address, info: Info.new(email: address, email_verified: true), credentials: {})

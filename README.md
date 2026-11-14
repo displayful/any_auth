@@ -336,7 +336,7 @@ When a vendor is unusual, override only the step that differs and call
 | `verify(params, session)` | the callback needs more than its state | Shopify's signature and shop |
 | `exchange(code, session)` | the code swap takes extra parameters | Shopify's `expiring: 1` |
 | `identity(token, session)` | the answer says who signed in | `OpenIDConnect` |
-| `state?(params, session)` | the vendor sends no state back | Relatel |
+| `state_echoed?(params, session)` | the vendor sends no state back | Relatel |
 
 For a vendor people sign in with, inherit from `OpenIDConnect` and answer
 `identity_from(claims)` with `{ uid:, info: }`. The audience, expiry and nonce

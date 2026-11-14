@@ -4,6 +4,7 @@ require 'json'
 require 'openssl'
 require 'securerandom'
 require 'time'
+require 'uri'
 
 require 'active_model'
 require 'active_support'

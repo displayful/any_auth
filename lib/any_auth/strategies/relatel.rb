@@ -12,7 +12,7 @@ module AnyAuth
 
       private
 
-      def state?(_params, _session)
+      def state_echoed?(_params, _session)
         true
       end
     end

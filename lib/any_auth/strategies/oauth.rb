@@ -13,11 +13,10 @@ module AnyAuth
       authorize_option :scope
 
       def request_phase(redirect_uri:, **params)
-        session = { 'state' => SecureRandom.hex(24), 'redirect_uri' => redirect_uri }
+        state = SecureRandom.hex(24)
+        url = client.auth_code.authorize_url(redirect_uri:, state:, **authorize_params, **params)
 
-        asked = authorize_options.index_with { public_send(it) }.compact_blank.merge(params)
-
-        Request.new(url: client.auth_code.authorize_url(redirect_uri:, state: session['state'], **asked), session:)
+        Request.new(url:, session: { 'state' => state, 'redirect_uri' => redirect_uri })
       end
 
       def callback_phase(params, session)
@@ -29,7 +28,9 @@ module AnyAuth
       end
 
       def expired?(credentials)
-        credentials['expires_at'].to_s.to_time&.before?(2.minutes.from_now) || false
+        expires_at = credentials['expires_at'].to_s.to_time
+
+        expires_at.present? && expires_at.before?(2.minutes.from_now)
       end
 
       def refresh(credentials)
@@ -44,16 +45,19 @@ module AnyAuth
 
       private
 
+      def authorize_params
+        authorize_options.index_with { public_send(it) }.compact_blank
+      end
+
       def verify(params, session)
         raise InvalidCallback, "No sign-in at #{provider} is under way" if session['redirect_uri'].blank?
-        raise InvalidCallback, "The state #{provider} sent back is not the one we sent" unless state?(params, session)
+        raise InvalidCallback, "#{provider} did not send back the state we sent" unless state_echoed?(params, session)
         raise Declined, params['error'] if params['error'].present?
         raise InvalidCallback, "#{provider} sent back no code" if params['code'].blank?
       end
 
-      def state?(params, session)
-        session['state'].present? &&
-          ActiveSupport::SecurityUtils.secure_compare(session['state'].to_s, params['state'].to_s)
+      def state_echoed?(params, session)
+        same?(session['state'], params['state'])
       end
 
       def exchange(code, session, **params)

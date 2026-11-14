@@ -25,6 +25,12 @@ module AnyAuth
       def refresh(credentials)
         credentials
       end
+
+      private
+
+      def same?(expected, given)
+        expected.present? && ActiveSupport::SecurityUtils.secure_compare(expected.to_s, given.to_s)
+      end
     end
   end
 end
