@@ -28,21 +28,21 @@ should not exist.
 
 It goes through the same two calls as every other strategy, so a controller
 needs no special case. Ask for the email with a form for the strategy, as for
-[any strategy with fields](../../README.md#showing-the-form):
+[any strategy with fields](../../README.md#fields):
 
 ```ruby
 def create
   developer = AnyAuth.strategy(:developer, params.expect(strategy: [:email]))
 
   if developer.valid?
-    redirect_to_provider developer, redirect_uri: callback_url
+    redirect_to_any_auth developer, redirect_uri: callback_url
   else
     render :new, status: :unprocessable_content
   end
 end
 
 def callback
-  auth = authenticate_with_provider(AnyAuth.strategy(:developer))
+  auth = authenticate_with_any_auth(AnyAuth.strategy(:developer))
 end
 ```
 

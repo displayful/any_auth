@@ -15,17 +15,17 @@ module AnyAuth
       def create
         strategy.assign_attributes(params.permit(:email))
 
-        redirect_to_provider strategy, redirect_uri: 'https://tavle.test/home', params: { membership_id: 7 }
+        redirect_to_any_auth strategy, redirect_uri: 'https://tavle.test/home', params: { membership_id: 7 }
       end
 
       def show
-        auth = authenticate_with_provider(strategy)
+        auth = authenticate_with_any_auth(strategy)
 
         render json: { uid: auth.uid, credentials: auth.credentials, params: auth.params }
       end
 
       def remembered
-        render json: provider_params(strategy)
+        render json: any_auth_params(strategy)
       end
 
       private
