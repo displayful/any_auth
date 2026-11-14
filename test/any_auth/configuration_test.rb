@@ -1,0 +1,70 @@
+require 'test_helper'
+
+module AnyAuth
+  class ConfigurationTest < ActiveSupport::TestCase
+    setup do
+      @config = Configuration.new
+      @config.provider :google, client_id: 'sign-in-app', client_secret: 'tys'
+    end
+
+    test 'a provider is built from its entry, and answers to its name' do
+      google = @config.strategy(:google)
+
+      assert_instance_of Strategies::Google, google
+      assert_equal 'google', google.provider
+      assert_equal 'sign-in-app', google.client_id
+    end
+
+    test 'an entry made from another shares its client and asks for something else' do
+      @config.provider :google_sheets, from: :google, scope: 'drive.file', access_type: 'offline'
+
+      sheets = @config.strategy(:google_sheets)
+      asked = Rack::Utils.parse_query(URI(sheets.request_phase(redirect_uri: 'https://tavle.test/cb').url).query)
+
+      assert_equal 'google_sheets', sheets.provider
+      assert_equal 'sign-in-app', asked['client_id']
+      assert_equal 'openid drive.file', asked['scope']
+      assert_equal 'offline', asked['access_type']
+    end
+
+    test 'an entry naming only the strategy shares nothing but the code' do
+      @config.provider 'google-sheets', strategy: :google, scope: 'drive.file'
+
+      sheets = @config.strategy('google-sheets', client_id: 'sheets-app')
+
+      assert_instance_of Strategies::Google, sheets
+      assert_equal 'sheets-app', sheets.client_id
+      assert_nil sheets.client_secret
+    end
+
+    test 'what is passed when building wins, and a callable is asked then' do
+      clients = %w[first second]
+      @config.provider :hubspot, client_id: -> { clients.shift }, scope: 'deals'
+
+      assert_equal 'first', @config.strategy(:hubspot).client_id
+      assert_equal 'second', @config.strategy(:hubspot).client_id
+      assert_equal 'mine', @config.strategy(:hubspot, client_id: 'mine').client_id
+    end
+
+    test 'fields are attributes of the strategy' do
+      @config.provider :shopify, scope: 'read_orders'
+
+      assert_equal 'mystore.myshopify.com', @config.strategy(:shopify, shop: 'mystore').shop
+    end
+
+    test 'a name nobody configured is an error, and is not listed' do
+      assert_equal %w[google], @config.providers
+      assert_raises(KeyError) { @config.strategy(:okta) }
+    end
+
+    test 'a provider keeps the name it was configured under, and is only ever a strategy' do
+      @config.provider :file
+
+      assert_equal 'google', @config.strategy(:google, provider: 'another').provider
+      assert_raises(ActiveModel::UnknownAttributeError) { @config.strategy(:google, scoop: 'email') }
+      assert_raises(ActiveModel::UnknownAttributeError) { @config.strategy(:google, authorize_options: [:scoop]) }
+      assert_raises(NameError) { @config.strategy(:file) }
+      assert_raises(ArgumentError) { @config.provider :loop, from: :loop }
+    end
+  end
+end

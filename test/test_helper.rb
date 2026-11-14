@@ -1,0 +1,6 @@
+require 'any_auth'
+require 'active_support/test_case'
+require 'active_support/testing/time_helpers'
+require 'minitest/autorun'
+require 'rack/utils'
+require 'webmock/minitest'
