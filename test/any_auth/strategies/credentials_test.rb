@@ -3,22 +3,13 @@ require 'test_helper'
 module AnyAuth
   module Strategies
     class CredentialsTest < ActiveSupport::TestCase
-      test 'each vendor is shown its credentials its own way' do
-        assert_equal({ 'Authorization' => 'Bearer adgang' }, Hubspot.new.authorization('access_token' => 'adgang'))
-        assert_equal({ 'X-Shopify-Access-Token' => 'adgang' }, Shopify.new.authorization('access_token' => 'adgang'))
-        assert_equal({ 'Authorization' => 'Basic YXBpOmhlbW1lbGlndA==' },
-          Adversus.new.authorization('username' => 'api', 'password' => 'hemmeligt'))
-        assert_equal({ 'X-AppSecretToken' => 'app', 'X-AgreementGrantToken' => 'aftale' },
-          Economic.new.authorization('app_token' => 'app', 'agreement_token' => 'aftale'))
-      end
-
       test 'credentials still good, or that never expire, are answered as they are' do
         good = { 'access_token' => 'adgang', 'expires_at' => 1.hour.from_now.utc.iso8601 }
         pasted = { 'username' => 'api', 'password' => 'hemmeligt' }
 
-        assert_equal good, hubspot.fresh(good)
-        assert_equal({ 'access_token' => 'adgang' }, hubspot.fresh({ 'access_token' => 'adgang' }))
-        assert_equal pasted, Adversus.new.fresh(pasted)
+        assert_equal good, hubspot.refresh(good)
+        assert_equal({ 'access_token' => 'adgang' }, hubspot.refresh({ 'access_token' => 'adgang' }))
+        assert_equal pasted, Adversus.new.refresh(pasted)
         assert_not_requested :post, 'https://api.hubapi.com/oauth/v1/token'
       end
 
@@ -27,11 +18,11 @@ module AnyAuth
           .to_return(headers: { 'Content-Type' => 'application/json' },
             body: { access_token: 'nyere', expires_in: 1800 }.to_json)
 
-        fresh = hubspot.fresh('access_token' => 'gammel', 'refresh_token' => 'igen',
+        renewed = hubspot.refresh('access_token' => 'gammel', 'refresh_token' => 'igen',
           'expires_at' => 1.minute.from_now.utc.iso8601)
 
-        assert_equal 'nyere', fresh['access_token']
-        assert_equal 'igen', fresh['refresh_token']
+        assert_equal 'nyere', renewed['access_token']
+        assert_equal 'igen', renewed['refresh_token']
       end
 
       test 'a developer comes straight home as whoever they say they are' do

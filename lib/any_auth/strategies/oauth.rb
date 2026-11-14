@@ -32,16 +32,14 @@ module AnyAuth
         credentials['expires_at'].to_s.to_time&.before?(2.minutes.from_now) || false
       end
 
-      def fresh(credentials)
-        expired?(credentials) ? credentials.merge(refresh(credentials)) : credentials
-      end
-
-      def authorization(credentials)
-        { 'Authorization' => "Bearer #{credentials['access_token']}" }
-      end
-
       def refresh(credentials)
-        credentials_from(asking_the_vendor { OAuth2::AccessToken.from_hash(client, credentials).refresh(parse: :json) })
+        expired?(credentials) ? refresh!(credentials) : credentials
+      end
+
+      def refresh!(credentials)
+        token = asking_the_vendor { OAuth2::AccessToken.from_hash(client, credentials).refresh(parse: :json) }
+
+        credentials.merge(credentials_from(token))
       end
 
       private

@@ -5,12 +5,6 @@ module AnyAuth
       attribute :password, :string
 
       validates :username, :password, presence: true
-
-      def authorization(credentials)
-        login = credentials.values_at('username', 'password').join(':')
-
-        { 'Authorization' => "Basic #{Base64.strict_encode64(login)}" }
-      end
     end
   end
 end

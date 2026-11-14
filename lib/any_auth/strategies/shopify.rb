@@ -22,10 +22,6 @@ module AnyAuth
         }
       end
 
-      def authorization(credentials)
-        { 'X-Shopify-Access-Token' => credentials['access_token'].to_s }
-      end
-
       private
 
       def verify(params, session)

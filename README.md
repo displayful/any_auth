@@ -165,29 +165,28 @@ auth.credentials
 # => { "access_token" => "…", "refresh_token" => "…", "expires_at" => "2026-11-13T10:00:00Z" }
 ```
 
-## Calling the vendor's API afterwards
+## Keeping the credentials working
 
-AnyAuth is not an HTTP client for the vendor's API. It answers the two things
-any client needs: credentials that work right now, and how this vendor wants
-them presented.
+AnyAuth is not a client for the vendor's API: how each vendor wants its token
+sent is on [its page](docs/strategies). What it does keep for you is the token
+itself.
 
 ```ruby
-credentials = strategy.fresh(credentials)   # unchanged if still good; renewed if about to expire
+credentials = strategy.refresh(credentials)   # unchanged if still good; renewed if about to expire
 save(credentials)
-
-Faraday.get("https://api.hubapi.com/crm/v3/objects/deals", nil, strategy.authorization(credentials))
 ```
 
-| Strategy | `authorization(credentials)` |
+| | |
 | --- | --- |
-| OAuth 2 | `{ "Authorization" => "Bearer …" }` |
-| `Shopify` | `{ "X-Shopify-Access-Token" => "…" }` |
-| `Adversus` | `{ "Authorization" => "Basic …" }` |
-| `Economic` | `{ "X-AppSecretToken" => "…", "X-AgreementGrantToken" => "…" }` |
+| `expired?(credentials)` | whether the access token runs out within two minutes |
+| `refresh(credentials)` | renews when `expired?`, and answers the credentials either way |
+| `refresh!(credentials)` | asks the vendor for a new token now |
 
-`strategy.expired?(credentials)` says whether a refresh is due, for an app that
-wants to lock or reload before it renews. A vendor that rotates its refresh
-token, as Shopify does, must not be refreshed twice at once.
+What comes back is the whole hash, with a refresh token the vendor did not
+replace kept in place. A vendor that rotates its refresh token, as Shopify
+does, must not be refreshed twice at once: check `expired?`, take a lock or
+reload, and then refresh. Strategies with nothing to renew answer the
+credentials unchanged.
 
 ## Vendors that ask for something first
 
@@ -267,8 +266,7 @@ from that hash later gives you both `shopify.shop` and working credentials.
 Some vendors have you paste a token or a login from their settings page.
 Those strategies inherit from `Base`. Show the same form, check `valid?`, and
 store `strategy.attributes`. To find out whether the vendor accepts what was
-typed, call its API once with `strategy.authorization(strategy.attributes)`
-before you save.
+typed, call its API once with them before you save.
 
 ## What comes back
 

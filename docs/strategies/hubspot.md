@@ -30,6 +30,6 @@ To learn which portal was connected, ask HubSpot with the token:
 
 ## Calling the API
 
-`authorization(credentials)` answers `{ "Authorization" => "Bearer …" }`.
-Access tokens are short-lived, so call `fresh(credentials)` before each use and
+Send the access token as `Authorization: Bearer …`. Access tokens are
+short-lived, so call `refresh(credentials)` before each use and
 save what it returns.

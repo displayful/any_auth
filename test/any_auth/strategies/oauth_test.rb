@@ -38,16 +38,16 @@ module AnyAuth
 
         token.to_return(status: 400, body: 'invalid_grant')
 
-        assert_raises(Unauthorized) { hubspot.refresh(held) }
-        assert_raises(Unauthorized) { hubspot.refresh({}) }
+        assert_raises(Unauthorized) { hubspot.refresh!(held) }
+        assert_raises(Unauthorized) { hubspot.refresh!({}) }
 
         token.to_return(status: 429)
 
-        assert_raises(RateLimited) { hubspot.refresh(held) }
+        assert_raises(RateLimited) { hubspot.refresh!(held) }
 
         token.to_return(status: 502, headers: { 'Content-Type' => 'text/html' }, body: '<html>Bad gateway</html>')
 
-        assert_raises(Unavailable) { hubspot.refresh(held) }
+        assert_raises(Unavailable) { hubspot.refresh!(held) }
       end
 
       test 'refreshing answers the renewed tokens' do
@@ -56,7 +56,7 @@ module AnyAuth
           .to_return(headers: { 'Content-Type' => 'application/json' },
             body: { access_token: 'nyere', expires_in: 1800 }.to_json)
 
-        renewed = hubspot.refresh('access_token' => 'gammel', 'refresh_token' => 'igen')
+        renewed = hubspot.refresh!('access_token' => 'gammel', 'refresh_token' => 'igen')
 
         assert_equal 'nyere', renewed['access_token']
         assert_operator Time.iso8601(renewed['expires_at']), :>, 20.minutes.from_now

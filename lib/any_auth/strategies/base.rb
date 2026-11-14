@@ -22,12 +22,8 @@ module AnyAuth
         false
       end
 
-      def fresh(credentials)
+      def refresh(credentials)
         credentials
-      end
-
-      def authorization(_credentials)
-        {}
       end
     end
   end

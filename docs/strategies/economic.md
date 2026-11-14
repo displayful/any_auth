@@ -27,15 +27,11 @@ accepts them, call its API once before saving:
 
 ```ruby
 strategy = AnyAuth.strategy("e-conomic", **fields)
-Faraday.get("https://restapi.e-conomic.com/self", nil, strategy.authorization(strategy.attributes))
+Faraday.get("https://restapi.e-conomic.com/self", nil,
+  "X-AppSecretToken" => strategy.app_token, "X-AgreementGrantToken" => strategy.agreement_token)
 ```
 
 ## What you store, and how it is presented
 
-Store `strategy.attributes`. `authorization(credentials)` answers:
-
-```ruby
-{ "X-AppSecretToken" => "…", "X-AgreementGrantToken" => "…" }
-```
-
-The tokens do not expire, so `fresh` returns them unchanged.
+Store `strategy.attributes`, and send them as the two headers above on every
+request. The tokens do not expire, so `refresh` returns them unchanged.

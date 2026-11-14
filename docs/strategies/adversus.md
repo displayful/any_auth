@@ -22,16 +22,9 @@ password.
 ## Checking what was typed
 
 `valid?` only checks that both are present. Call the Adversus API once with
-`strategy.authorization(strategy.attributes)` before saving, to learn whether
-the login works.
+them before saving, to learn whether the login works.
 
 ## What you store, and how it is presented
 
-Store `strategy.attributes`. `authorization(credentials)` answers HTTP basic
-auth:
-
-```ruby
-{ "Authorization" => "Basic …" }
-```
-
-The login does not expire, so `fresh` returns it unchanged.
+Store `strategy.attributes`, and send them to the API as HTTP basic auth. The
+login does not expire, so `refresh` returns it unchanged.

@@ -30,6 +30,6 @@ back, and what is unusual about it.
 - **Fields-only** strategies have no round trip. The person types what the
   vendor gave them, and `strategy.attributes` is what you store.
 
-Every strategy answers `authorization(credentials)`, the headers its vendor
-wants on an API call, and `fresh(credentials)`, which renews what is about to
-expire and leaves everything else alone.
+Every strategy answers `refresh(credentials)`, which renews what is about to
+expire and leaves everything else alone. How a vendor wants its credentials
+sent on an API call is on its page; sending them is your client's job.

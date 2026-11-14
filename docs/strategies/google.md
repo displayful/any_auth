@@ -47,6 +47,5 @@ client id), expiry, the nonce sent with this request, and issuer
 
 ## Calling the API
 
-`authorization(credentials)` answers `{ "Authorization" => "Bearer …" }`.
-Access tokens last about an hour; `fresh(credentials)` renews them when a
-refresh token is stored.
+Send the access token as `Authorization: Bearer …`. Access tokens last about
+an hour; `refresh(credentials)` renews them when a refresh token is stored.

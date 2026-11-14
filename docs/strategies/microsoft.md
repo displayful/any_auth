@@ -50,4 +50,4 @@ strategy's.
 
 ## Calling the API
 
-`authorization(credentials)` answers `{ "Authorization" => "Bearer …" }`.
+Send the access token as `Authorization: Bearer …`.
