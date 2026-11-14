@@ -125,8 +125,11 @@ strings.
 - The button that starts it must not be a Turbo submission
   (`data: { turbo: false }`), or the browser fetches the vendor's page in the
   background and fails.
-- One sign-in per provider at a time in a browser: a second tab replaces the
-  first, and reloading the callback is an `InvalidCallback`.
+- One sign-in at a time in a browser: starting a second replaces the first,
+  whichever provider it is for, and reloading the callback is an
+  `InvalidCallback`.
+- With the cookie session store, a slower request from another tab can write
+  an older session back and drop the sign-in. The person starts again.
 
 ## One place for providers
 
@@ -498,7 +501,9 @@ auth = strategy.callback_phase(query, kept)   # both string-keyed hashes
 
 `query` is what the vendor sent in the callback's query string, and `kept` is
 `request.session` from before. Keeping it somewhere safe, for a limited time
-and for one use, is then yours to do.
+and for one use, is then yours to do. So is giving the strategy the same
+fields again in the callback: Shopify needs its shop, the developer strategy
+its email.
 
 ## What it does not do
 

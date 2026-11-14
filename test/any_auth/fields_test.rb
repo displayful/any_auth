@@ -68,7 +68,6 @@ module AnyAuth
 
       get '/shops/callback', params: answer.merge('hmac' => hmac)
 
-      assert response.location.nil?
       assert_equal({ 'shop' => 'mystore.myshopify.com', 'access_token' => 'ny' }, response.parsed_body)
     end
 

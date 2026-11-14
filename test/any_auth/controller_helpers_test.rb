@@ -55,6 +55,25 @@ module AnyAuth
       assert_equal({ 'membership_id' => 7 }, response.parsed_body['params'])
     end
 
+    test 'a second sign-in replaces the first, whichever provider it is for' do
+      post '/hubspot/leave'
+      first = state_sent
+      post '/relatel/leave'
+      get '/hubspot/home', params: { code: 'kode', state: first }
+
+      assert_response :unprocessable_content
+    end
+
+    test 'with no sign-in under way there is nothing to read and nothing to come home to' do
+      get '/hubspot/remembered'
+
+      assert_empty response.parsed_body
+
+      get '/hubspot/home', params: { code: 'kode', state: 'x' }
+
+      assert_response :unprocessable_content
+    end
+
     test 'coming home a second time is not a sign-in' do
       post '/hubspot/leave'
       state = state_sent
@@ -102,7 +121,7 @@ module AnyAuth
     test 'the fields a strategy was given come home with it, and never show in the address' do
       post '/developer/leave', params: { email: 'Mette@Acme.test' }
 
-      assert_not_includes response.location, 'acme'
+      assert_equal %w[state], Rack::Utils.parse_query(URI(response.location).query).keys
 
       get '/developer/home', params: { state: state_sent }
 
