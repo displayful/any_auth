@@ -218,7 +218,7 @@ Override only the step that differs, calling `super`:
 | --- | --- | --- |
 | `verify(params, session)` | a callback that needs more than its state | Shopify's signature |
 | `exchange(code, session)` | extra parameters on the code swap | Shopify's `expiring: 1` |
-| `identity(token, session)` | saying who signed in | `OpenIDConnect` |
+| `identity(access_token, session)` | saying who signed in | `OpenIDConnect` |
 
 The client's id and secret are sent in the request body. A vendor that wants
 them another way says so in `client_options`, such as `auth_scheme: :basic_auth`.

@@ -18,15 +18,15 @@ module AnyAuth
         ['openid', *scope.split].uniq.join(' ')
       end
 
-      def identity(token, session)
-        claims = decode_id_token(token)
+      def identity(access_token, session)
+        claims = decode_id_token(access_token)
         raise Unauthorized, 'Invalid ID token' unless valid_claims?(claims, session)
 
         identity_from(claims).merge(raw: claims)
       end
 
-      def decode_id_token(token)
-        claims = JWT.decode(token.params['id_token'], nil, false).first
+      def decode_id_token(access_token)
+        claims = JWT.decode(access_token.params['id_token'], nil, false).first
         raise Unauthorized, 'Invalid ID token' unless claims.is_a?(Hash)
 
         claims

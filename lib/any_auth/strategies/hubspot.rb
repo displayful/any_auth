@@ -13,8 +13,8 @@ module AnyAuth
 
       private
 
-      def identity(token, _session)
-        token_info = get(token, "/oauth/v1/access-tokens/#{token.token}")
+      def identity(access_token, _session)
+        token_info = get(access_token, "/oauth/v1/access-tokens/#{access_token.token}")
         raise Unauthorized, "#{provider} returned no user" if token_info['user_id'].blank?
 
         {

@@ -32,9 +32,10 @@ module AnyAuth
 
       def callback_phase(params, session)
         verify(params, session)
-        token = exchange(params['code'], session)
+        access_token = exchange(params['code'], session)
+        credentials = credentials_from(access_token)
 
-        Auth.new(provider:, credentials: credentials_from(token), **identity(token, session))
+        Auth.new(provider:, credentials:, **identity(access_token, session))
       end
 
       def expired?(credentials)
@@ -50,9 +51,11 @@ module AnyAuth
       end
 
       def refresh!(credentials)
-        token = with_error_handling { OAuth2::AccessToken.from_hash(client, credentials).refresh }
+        access_token = with_error_handling do
+          OAuth2::AccessToken.from_hash(client, credentials).refresh
+        end
 
-        credentials.except('expires_at').merge(credentials_from(token))
+        credentials.except('expires_at').merge(credentials_from(access_token))
       end
 
       private
@@ -85,13 +88,13 @@ module AnyAuth
         {}
       end
 
-      def credentials_from(token)
-        raise Unauthorized, "#{provider} returned no access token" if token.token.blank?
+      def credentials_from(access_token)
+        raise Unauthorized, "#{provider} returned no access token" if access_token.token.blank?
 
         {
-          'access_token' => token.token,
-          'refresh_token' => token.refresh_token,
-          'expires_at' => (Time.at(token.expires_at).utc.iso8601 if token.expires_at),
+          'access_token' => access_token.token,
+          'refresh_token' => access_token.refresh_token,
+          'expires_at' => (Time.at(access_token.expires_at).utc.iso8601 if access_token.expires_at),
         }.compact
       end
 
@@ -103,8 +106,8 @@ module AnyAuth
         { auth_scheme: :request_body }
       end
 
-      def get(token, path)
-        body = with_error_handling { token.get(path, snaky: false).parsed }
+      def get(access_token, path)
+        body = with_error_handling { access_token.get(path, snaky: false).parsed }
         raise Unavailable, "#{provider} returned an unreadable response" unless body.is_a?(Hash)
 
         body

@@ -15,8 +15,8 @@ module AnyAuth
 
       private
 
-      def identity(token, _session)
-        employee = get(token, '/api/v2/employee')['employee'] || {}
+      def identity(access_token, _session)
+        employee = get(access_token, '/api/v2/employee')['employee'] || {}
         raise Unauthorized, "#{provider} returned no employee" if employee['id'].blank?
 
         {

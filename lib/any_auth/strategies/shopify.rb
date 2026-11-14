@@ -54,8 +54,8 @@ module AnyAuth
         super(code, session, expiring: 1)
       end
 
-      def identity(token, _session)
-        { uid: shop, raw: token.params }
+      def identity(access_token, _session)
+        { uid: shop, raw: access_token.params }
       end
     end
   end
