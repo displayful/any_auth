@@ -12,7 +12,7 @@ module AnyAuth
                .to_return(headers: { 'Content-Type' => 'application/json' },
                  body: { access_token: 'ny', refresh_token: 'igen', token_type: 'bearer' }.to_json)
 
-        portal_answers(hub_id: 8823, hub_domain: 'acme.test')
+        token_info_answers(user_id: 41, hub_id: 8823)
 
         auth = hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD)
 
@@ -20,22 +20,23 @@ module AnyAuth
         assert_equal({ 'access_token' => 'ny', 'refresh_token' => 'igen' }, auth.credentials)
       end
 
-      test 'HubSpot names the portal that was connected' do
+      test 'HubSpot names the user who signed in, and says which portal they opened' do
         stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
           .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
-        portal_answers(hub_id: 8823, hub_domain: 'acme.test')
+        token_info_answers(user_id: 41, user: 'mette@acme.test', hub_id: 8823, hub_domain: 'acme.test')
 
         auth = hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD)
 
-        assert_equal '8823', auth.uid
-        assert_equal 'acme.test', auth.info.name
+        assert_equal '41', auth.uid
+        assert_equal 'mette@acme.test', auth.info.email
+        assert_not auth.info.email_verified
         assert_equal 8823, auth.raw['hub_id']
       end
 
-      test 'a token HubSpot will not name a portal for is no sign-in' do
+      test 'a token HubSpot will not name a user for is no sign-in' do
         stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
           .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
-        portal_answers(message: 'unknown token')
+        token_info_answers(message: 'unknown token')
 
         assert_raises(Unauthorized) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
       end
@@ -97,12 +98,14 @@ module AnyAuth
         stub_request(:get, 'https://app.relatel.dk/api/v2/employee')
           .with(headers: { 'Authorization' => 'Bearer ny' })
           .to_return(headers: { 'Content-Type' => 'application/json' },
-            body: { employee: { company_id: 8823 } }.to_json)
+            body: { employee: { id: 34, name: 'Mette Holm', company_id: 8823 } }.to_json)
 
         auth = Relatel.new(client_id: 'app', client_secret: 'tys').callback_phase({ 'code' => 'kode' }, HELD)
 
         assert_requested swap
-        assert_equal '8823', auth.uid
+        assert_equal '34', auth.uid
+        assert_equal 'Mette Holm', auth.info.name
+        assert_equal 8823, auth.raw['company_id']
       end
 
       test 'a vendor that answers with an error declined, once the callback is known to be ours' do
@@ -119,9 +122,9 @@ module AnyAuth
         Hubspot.new(client_id: 'app', client_secret: 'tys')
       end
 
-      def portal_answers(**portal)
+      def token_info_answers(**token_info)
         stub_request(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/ny')
-          .to_return(headers: { 'Content-Type' => 'application/json' }, body: portal.to_json)
+          .to_return(headers: { 'Content-Type' => 'application/json' }, body: token_info.to_json)
       end
     end
   end

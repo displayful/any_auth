@@ -31,7 +31,7 @@ module AnyAuth
       stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
         .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
       stub_request(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/ny')
-        .to_return(headers: { 'Content-Type' => 'application/json' }, body: { hub_id: 8823 }.to_json)
+        .to_return(headers: { 'Content-Type' => 'application/json' }, body: { user_id: 41, hub_id: 8823 }.to_json)
     end
 
     test 'leaving for a provider and coming home is one call each' do

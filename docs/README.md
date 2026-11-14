@@ -22,8 +22,8 @@ back, and what is unusual about it.
 ## The three kinds
 
 - **OAuth 2** strategies send the person to the vendor and come back with
-  credentials. Where the vendor can say which account was connected,
-  `auth.uid` names it.
+  credentials. `auth.uid` is who signed in; which account that opened is in
+  `auth.raw`.
 - **OpenID Connect** strategies are OAuth 2 plus an answer to who signed in.
   They always ask for `openid`, send a nonce and a PKCE challenge, and read
   `auth.uid` and `auth.info` from the ID token.

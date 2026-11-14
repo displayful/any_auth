@@ -18,9 +18,9 @@ module AnyAuth
 
       def identity(token, _session)
         employee = asked_with(token, '/api/v2/employee').fetch('employee', {})
-        raise Unauthorized, 'relatel named no company for this token' if employee['company_id'].blank?
+        raise Unauthorized, 'relatel named no employee for this token' if employee['id'].blank?
 
-        { uid: employee['company_id'].to_s, raw: employee }
+        { uid: employee['id'].to_s, info: Info.new(name: employee['name'], email: employee['email']), raw: employee }
       end
     end
   end

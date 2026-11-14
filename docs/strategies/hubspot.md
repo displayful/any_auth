@@ -22,14 +22,18 @@ redirect URL, and tick the same scopes you ask for.
 
 | | |
 | --- | --- |
-| `auth.uid` | the portal's `hub_id`, as a string |
-| `auth.info.name` | the portal's domain |
+| `auth.uid` | the id of the user who signed in (`user_id`), as a string |
+| `auth.info.email` | their address (`user`). HubSpot does not vouch for it, so `email_verified` is false |
 | `auth.credentials` | `access_token`, `refresh_token`, `expires_at` |
-| `auth.raw` | HubSpot's answer about the token: `hub_id`, `hub_domain`, `user`, `scopes` |
+| `auth.raw` | HubSpot's answer about the token: `user_id`, `user`, `hub_id`, `hub_domain`, `scopes` |
 
-The strategy asks HubSpot once, with the new token, which portal it belongs to
+The portal they opened is `auth.raw["hub_id"]`, with its domain in
+`auth.raw["hub_domain"]`. Key a connection on the portal, not on the user:
+colleagues signing in to the same portal have different `uid`s.
+
+The strategy asks HubSpot once, with the new token, whose it is
 (`GET /oauth/v1/access-tokens/<access_token>`). A token HubSpot names no
-portal for is an `AnyAuth::Unauthorized`.
+user for is an `AnyAuth::Unauthorized`.
 
 ## Calling the API
 

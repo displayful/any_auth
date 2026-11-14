@@ -232,6 +232,10 @@ do not carry the strategy's class name:
 <% end %>
 ```
 
+A plain Rails form builder only wraps an invalid field in `field_with_errors`;
+printing the message is yours to do, as above, unless your app's own builder
+shows it for you.
+
 `strategy.class.attribute_names` lists the fields, and
 `strategy.class.fields?` says whether there are any, for a page that draws
 whichever vendor it is given. The gem does not know which fields are secret;
@@ -294,7 +298,7 @@ typed, call its API once with them before you save.
 | | |
 | --- | --- |
 | `auth.provider` | the name the provider is configured under: `"google"`, `"shopify"` |
-| `auth.uid` | who or what was signed in to, as the vendor names it. Stable; use it as the key |
+| `auth.uid` | who signed in, as the vendor identifies them. Stable; key a person on it |
 | `auth.info` | what is known about them, or nil when the vendor says nothing |
 | `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` when the vendor sends them |
 | `auth.raw` | what the vendor said, as it said it: the ID token's claims, or its answer about the account |
@@ -309,21 +313,21 @@ Each is nil when the vendor does not say:
 | `email_verified` | whether the vendor vouches that they own it. False unless the strategy is sure |
 | `image` | the address of a picture |
 
-What `uid` and `info` hold differs by vendor, and each
-[strategy's page](docs/strategies) says exactly what:
+`uid` is always who signed in, never the account they opened. A vendor with
+tenants says which one in `auth.raw`, and your app decides what to key on:
 
-| Strategy | `uid` | `info` |
+| Strategy | `uid`: who signed in | In `raw`: what they opened |
 | --- | --- | --- |
-| Google | the person's `sub` | name, email, picture |
-| Microsoft | tenant id and object id | name, email |
-| HubSpot | the portal id | the portal's domain as `name` |
-| Relatel | the company id | nil |
-| Shopify | the shop's domain | nil |
-| Developer | the email typed | that email |
+| Google | the person's `sub` | `hd`, their Workspace domain |
+| Microsoft | tenant id and object id | `tid`, their tenant |
+| HubSpot | the user's id | `hub_id` and `hub_domain`, the portal |
+| Relatel | the employee's id | `company_id`, the company |
+| Shopify | the shop's domain | nothing more: an offline token has no person, so the shop is who signed in |
+| Developer | the email typed | nothing |
 
-Anything a vendor says beyond these is in `auth.raw`: Google's `hd`,
-Microsoft's `tid`, HubSpot's `user`. Read it there when your app has a rule of
-its own, such as which tenants may sign in.
+So a connection to a company's HubSpot is keyed on `auth.raw["hub_id"]`, and
+two colleagues signing in to the same portal are the same connection. Each
+[strategy's page](docs/strategies) lists what its `raw` holds.
 
 ## Errors
 

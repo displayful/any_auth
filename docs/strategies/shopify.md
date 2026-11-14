@@ -54,7 +54,7 @@ a bearer token.
 
 | | |
 | --- | --- |
-| `auth.uid` | the shop's `myshopify.com` domain |
+| `auth.uid` | the shop's `myshopify.com` domain. An offline token belongs to the shop, not to a person, so the shop is who signed in |
 | `auth.info` | nil |
 | `auth.credentials` | `access_token`, `refresh_token`, `expires_at` |
 | `auth.raw` | what Shopify sent with the token, such as the granted `scope` |

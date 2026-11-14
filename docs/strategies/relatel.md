@@ -26,13 +26,16 @@ that was connected) before it is used.
 
 | | |
 | --- | --- |
-| `auth.uid` | the company's id, as a string |
-| `auth.info` | nil |
+| `auth.uid` | the id of the employee who signed in, as a string |
+| `auth.info` | their `name` and `email` when Relatel gives them; `email_verified` is false |
 | `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` when Relatel sends them |
-| `auth.raw` | the signed-in employee, as Relatel describes them |
+| `auth.raw` | the employee, as Relatel describes them, including `company_id` |
+
+The company they belong to is `auth.raw["company_id"]`. Key a connection on
+the company, not on the employee.
 
 The strategy asks Relatel once, with the new token, who the employee is
-(`GET /api/v2/employee`), and takes the company from the answer.
+(`GET /api/v2/employee`).
 
 ## Calling the API
 
