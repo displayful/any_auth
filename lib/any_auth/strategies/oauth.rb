@@ -96,7 +96,11 @@ module AnyAuth
       end
 
       def client
-        OAuth2::Client.new(client_id, client_secret, auth_scheme: :request_body, **client_options)
+        OAuth2::Client.new(client_id, client_secret, **default_client_options, **client_options)
+      end
+
+      def default_client_options
+        { auth_scheme: :request_body }
       end
 
       def get(token, path)

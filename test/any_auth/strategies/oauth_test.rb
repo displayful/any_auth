@@ -90,6 +90,23 @@ module AnyAuth
         assert_raises(RateLimited) { hubspot.refresh!('refresh_token' => 'refresh') }
       end
 
+      test 'the client is named in the request body, unless the strategy asks for another scheme' do
+        stub_json(:post, TOKEN_URL, access_token: 'new')
+        strategy_class = Class.new(Hubspot) do
+          def client_options
+            super.merge(auth_scheme: :basic_auth)
+          end
+        end
+
+        basic = strategy_class.new(client_id: 'app', client_secret: 'secret', provider: 'basic')
+
+        hubspot.callback_phase(callback_params, stored_session)
+        basic.callback_phase(callback_params, stored_session)
+
+        assert_requested :post, TOKEN_URL, body: hash_including('client_secret' => 'secret')
+        assert_requested :post, TOKEN_URL, headers: { 'Authorization' => /\ABasic / }
+      end
+
       test 'no challenge is sent unless PKCE is switched on' do
         request = hubspot.request_phase(redirect_uri: CALLBACK_URL)
 
