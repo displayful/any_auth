@@ -8,7 +8,8 @@ OAuth 2 for the Relatel telephony API.
 config.provider :relatel, client_id: "…", client_secret: "…"
 ```
 
-It declares no options beyond `scope`.
+It declares no options beyond `scope`. A PKCE challenge (S256) is always sent;
+Relatel lists it in its discovery document.
 
 ## What comes back
 
