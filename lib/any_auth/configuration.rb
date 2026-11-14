@@ -6,10 +6,13 @@ module AnyAuth
       @entries = {}
     end
 
-    def provider(name, from: nil, strategy: from ? strategy_class(from) : name, **options)
-      options = entry_for(from)[:options].merge(options) if from
+    def provider(name, strategy: nil, from: nil, **options)
+      if from
+        strategy ||= strategy_class(from)
+        options = entry_for(from)[:options].merge(options)
+      end
 
-      @entries[name.to_s] = { strategy_class: class_named(strategy), options: }
+      @entries[name.to_s] = { strategy_class: class_named(strategy || name), options: }
     end
 
     def providers
