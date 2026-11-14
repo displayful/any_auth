@@ -114,7 +114,7 @@ module AnyAuth
         assert_raises(InvalidCallback) { hubspot.callback_phase({ 'code' => 'kode' }, nil) }
       end
 
-      test 'Relatel echoes no state back, and is swapped all the same' do
+      test 'Relatel names the employee who signed in, and refuses a callback without the state' do
         swap = stub_request(:post, 'https://app.relatel.dk/api/v2/token')
                .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
 
@@ -123,12 +123,11 @@ module AnyAuth
           .to_return(headers: { 'Content-Type' => 'application/json' },
             body: { employee: { id: 34, name: 'Mette Holm', company_id: 8823 } }.to_json)
 
-        auth = Relatel.new(client_id: 'app', client_secret: 'tys').callback_phase({ 'code' => 'kode' }, HELD)
+        relatel = Relatel.new(client_id: 'app', client_secret: 'tys')
+        auth = relatel.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD)
 
         assert_requested swap
-        assert_raises(InvalidCallback) do
-          Relatel.new(client_id: 'app', client_secret: 'tys').callback_phase({ 'code' => 'kode', 'state' => 'x' }, HELD)
-        end
+        assert_raises(InvalidCallback) { relatel.callback_phase({ 'code' => 'kode' }, HELD) }
         assert_equal '34', auth.uid
         assert_equal 'Mette Holm', auth.info.name
         assert_equal 8823, auth.raw['company_id']

@@ -52,13 +52,9 @@ module AnyAuth
 
       def verify(params, session)
         raise InvalidCallback, "No sign-in at #{provider} is under way" if session['redirect_uri'].blank?
-        raise InvalidCallback, "#{provider} did not send back the state we sent" unless state_echoed?(params, session)
+        raise InvalidCallback, "#{provider} did not send back the state we sent" unless same?(session['state'], params['state'])
         raise Declined, params['error'] if params['error'].present?
         raise InvalidCallback, "#{provider} sent back no code" if params['code'].blank?
-      end
-
-      def state_echoed?(params, session)
-        same?(session['state'], params['state'])
       end
 
       def exchange(code, session, **params)

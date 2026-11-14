@@ -190,8 +190,9 @@ unconfigured provider is a `KeyError`.
 | --- | --- | --- |
 | [`Google`](docs/strategies/google.md) | OpenID Connect | |
 | [`Microsoft`](docs/strategies/microsoft.md) | OpenID Connect | work, school and personal accounts |
+| [`Apple`](docs/strategies/apple.md) | OpenID Connect | signed client secret; the callback is a `POST` you send on |
 | [`Hubspot`](docs/strategies/hubspot.md) | OAuth 2 | one more request, to name the user |
-| [`Relatel`](docs/strategies/relatel.md) | OAuth 2 | the vendor echoes no state |
+| [`Relatel`](docs/strategies/relatel.md) | OAuth 2 | one more request, to name the employee |
 | [`Shopify`](docs/strategies/shopify.md) | OAuth 2 with a field | per-shop endpoints, signed callback |
 | [`Economic`](docs/strategies/economic.md), [`Adversus`](docs/strategies/adversus.md) | fields only | |
 | [`Developer`](docs/strategies/developer.md) | a field | sign in as anyone; development only, loaded on request |
@@ -215,8 +216,6 @@ Override only the step that differs, calling `super`:
 | `verify(params, session)` | a callback that needs more than its state | Shopify's signature |
 | `exchange(code, session)` | extra parameters on the code swap | Shopify's `expiring: 1` |
 | `identity(token, session)` | saying who signed in | `OpenIDConnect` |
-| `state_echoed?(params, session)` | a vendor that sends no state back | Relatel |
-
 For sign-in, inherit from `OpenIDConnect` and answer `identity_from(claims)`
 with `{ uid:, info: }`, checking the issuer there.
 
@@ -271,7 +270,8 @@ to do, as is giving the strategy its fields again in the callback.
 
 ## Limits
 
-- No SAML, OAuth 1, or callbacks that arrive as a cross-site `POST`.
+- No SAML or OAuth 1. A callback that arrives as a cross-site `POST` is sent
+  on to a `GET` by your app, as [Apple's](docs/strategies/apple.md) is.
 - Endpoints are written in the strategy; there is no discovery.
 - The ID token is read from the token endpoint over TLS and checked for
   audience, expiry, nonce and issuer. Its signature is not verified, which

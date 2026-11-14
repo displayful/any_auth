@@ -12,6 +12,7 @@ back, and what is unusual about it.
 | --- | --- | --- |
 | [Google](strategies/google.md) | OpenID Connect | signing in, and Google APIs |
 | [Microsoft](strategies/microsoft.md) | OpenID Connect | signing in, and Microsoft APIs |
+| [Apple](strategies/apple.md) | OpenID Connect | signing in; the callback is a `POST` |
 | [HubSpot](strategies/hubspot.md) | OAuth 2 | the HubSpot API |
 | [Relatel](strategies/relatel.md) | OAuth 2 | the Relatel API |
 | [Shopify](strategies/shopify.md) | OAuth 2 with a field | a shop's Admin API |
