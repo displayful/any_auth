@@ -4,8 +4,8 @@ module AnyAuth
       def request_phase(redirect_uri:, scope: self.scope || 'email profile', **params)
         nonce = SecureRandom.hex(16)
         pkce = PKCE.pair
-        request = super(redirect_uri:, scope: with_openid(scope), nonce:,
-          code_challenge: pkce.challenge, code_challenge_method: 'S256', **params)
+        request = super(redirect_uri:, **params, scope: with_openid(scope), nonce:,
+          code_challenge: pkce.challenge, code_challenge_method: 'S256')
 
         request.with(session: request.session.merge('nonce' => nonce, 'code_verifier' => pkce.verifier))
       end
@@ -28,18 +28,34 @@ module AnyAuth
       end
 
       def claims_in(token)
-        JWT.decode(token.params.fetch('id_token'), nil, false).first
-      rescue JWT::DecodeError, KeyError
+        claims = JWT.decode(token.params.fetch('id_token'), nil, false).first
+        return claims if claims.is_a?(Hash)
+
+        raise Unauthorized, "#{provider} sent an ID token that says nothing"
+      rescue JWT::DecodeError, KeyError, ArgumentError, TypeError
         raise Unauthorized, "#{provider} sent no ID token we can read"
       end
 
       def for_us?(claims, session)
-        Array(claims['aud']).include?(client_id) && Time.at(claims['exp'].to_i).future? &&
-          same?(session['nonce'], claims['nonce'])
+        issued_to_us?(claims) && unexpired?(claims) && same?(session['nonce'], claims['nonce'])
+      end
+
+      def issued_to_us?(claims)
+        audiences = Array(claims['aud'])
+
+        client_id.present? && audiences.include?(client_id) && claims['azp'].in?([nil, client_id]) &&
+          (audiences.one? || claims['azp'] == client_id)
+      end
+
+      def unexpired?(claims)
+        claims['exp'].is_a?(Numeric) && Time.at(claims['exp']).future?
       end
 
       def required(claims, name)
-        claims[name].presence || raise(Unauthorized, "The ID token from #{provider} has no #{name}")
+        value = claims[name]
+        return value if value.is_a?(String) && value.present?
+
+        raise Unauthorized, "The ID token from #{provider} has no #{name}"
       end
     end
   end

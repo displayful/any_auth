@@ -1,6 +1,6 @@
 # HubSpot
 
-Plain OAuth 2 for the HubSpot API. It overrides nothing.
+OAuth 2 for the HubSpot API, plus one request after the code swap to learn who signed in.
 
 ## Configure
 
@@ -34,6 +34,14 @@ colleagues signing in to the same portal have different `uid`s.
 The strategy asks HubSpot once, with the new token, whose it is
 (`GET /oauth/v1/access-tokens/<access_token>`). A token HubSpot names no
 user for is an `AnyAuth::Unauthorized`.
+
+Three things follow from that request:
+
+- The access token is in the address, as HubSpot's API requires. The gem keeps
+  it out of its own error messages and attaches no underlying error, but an
+  HTTP logger or APM that records outgoing addresses will see it.
+- If it fails, the sign-in fails, although the code was already swapped.
+- HubSpot echoes the token in its answer; `auth.raw` leaves that key out.
 
 ## Calling the API
 

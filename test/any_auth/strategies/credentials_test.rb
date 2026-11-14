@@ -1,4 +1,5 @@
 require 'test_helper'
+require 'any_auth/strategies/developer'
 
 module AnyAuth
   module Strategies
@@ -11,6 +12,23 @@ module AnyAuth
         assert_equal({ 'access_token' => 'adgang' }, hubspot.refresh({ 'access_token' => 'adgang' }))
         assert_equal pasted, Adversus.new.refresh(pasted)
         assert_not_requested :post, 'https://api.hubapi.com/oauth/v1/token'
+      end
+
+      test 'expiry is read whether it was stored as text, as a number or under symbol keys' do
+        assert hubspot.expired?('expires_at' => 1.minute.from_now.to_i)
+        assert hubspot.expired?(expires_at: 1.minute.from_now.utc.iso8601)
+        assert hubspot.expired?('expires_at' => 'not a time')
+        assert_not hubspot.expired?('expires_at' => 3.minutes.from_now.to_i)
+      end
+
+      test 'a renewal that names no new expiry forgets the old one' do
+        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
+          .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'nyere' }.to_json)
+
+        renewed = hubspot.refresh('access_token' => 'gammel', 'refresh_token' => 'igen',
+          'expires_at' => 1.minute.ago.utc.iso8601)
+
+        assert_not hubspot.expired?(renewed)
       end
 
       test 'credentials about to expire are renewed, keeping a refresh token the vendor did not replace' do
@@ -52,6 +70,15 @@ module AnyAuth
         assert_raises(InvalidCallback) do
           Developer.new.callback_phase({ 'email' => 'a@b.test', 'state' => 'forged' }, request.session)
         end
+        assert_raises(InvalidCallback) do
+          Developer.new.callback_phase(params.merge('email' => ['a@b.test']), request.session)
+        end
+      end
+
+      test 'a developer keeps what the address to come home to already asked' do
+        request = Developer.new(email: 'a@b.test').request_phase(redirect_uri: 'https://tavle.test/home?tenant=7')
+
+        assert_equal '7', Rack::Utils.parse_query(URI(request.url).query)['tenant']
       end
 
       private

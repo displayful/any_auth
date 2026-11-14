@@ -13,8 +13,10 @@ It declares no options beyond `scope`.
 ## The vendor echoes no state
 
 Relatel does not send the `state` parameter back to the callback, so the
-strategy cannot compare it. It still requires that a sign-in at Relatel was
-started in this browser within the last ten minutes, and nothing more.
+strategy cannot require it. A state that does come back must match. Beyond
+that the strategy only requires a stored request; with `ControllerHelpers`
+that means one started in this browser within the last ten minutes. If you
+store requests yourself, enforce that.
 
 The consequence: while someone's Relatel sign-in is under way, a callback
 address forged by another party and opened in that same browser would be
@@ -35,7 +37,8 @@ The company they belong to is `auth.raw["company_id"]`. Key a connection on
 the company, not on the employee.
 
 The strategy asks Relatel once, with the new token, who the employee is
-(`GET /api/v2/employee`).
+(`GET /api/v2/employee`). If that request fails the sign-in fails, although
+the code was already swapped.
 
 ## Calling the API
 

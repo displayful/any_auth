@@ -8,12 +8,15 @@ a development machine with no vendor, no client id and no network.
 ## Configure
 
 ```ruby
-config.provider :developer if Rails.env.development?
+if Rails.env.development?
+  require "any_auth/strategies/developer"
+  config.provider :developer
+end
 ```
 
-Registering it behind that condition is the whole safeguard: where it is not
-registered, `AnyAuth.strategy(:developer)` raises, and your route for it should
-not exist.
+The gem does not load it by itself. Where it is not required and registered,
+`AnyAuth.strategy(:developer)` raises a `KeyError`, and your route for it
+should not exist.
 
 ## Field
 

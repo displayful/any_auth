@@ -19,6 +19,7 @@ module AnyAuth
         expires: 10.minutes,
         httponly: true,
         same_site: :lax,
+        secure: request.ssl?,
       }
     end
 

@@ -17,6 +17,12 @@ module AnyAuth
           iss: "https://login.microsoftonline.com/#{PERSONAL}/v2.0").info.email_verified
       end
 
+      test 'a token issued by another tenant than the one it names is refused' do
+        assert_raises(Unauthorized) do
+          auth(oid: 'o-1', iss: "https://login.microsoftonline.com/#{PERSONAL}/v2.0")
+        end
+      end
+
       test 'a tenant that is not a tenant id is refused' do
         assert_raises(Unauthorized) do
           auth(oid: 'o-1', tid: 'common', iss: 'https://login.microsoftonline.com/common/v2.0')

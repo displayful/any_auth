@@ -10,6 +10,8 @@ module AnyAuth
       end
 
       def client_options
+        raise ArgumentError, "#{shop.inspect} is not a Shopify shop" unless valid?
+
         {
           site: URI::HTTPS.build(host: shop).to_s,
           authorize_url: '/admin/oauth/authorize',
@@ -35,7 +37,7 @@ module AnyAuth
       end
 
       def signed_by_shopify?(params)
-        client_secret.present? && same?(signature_of(params), params['hmac'])
+        client_secret.present? && params.values.all?(String) && same?(signature_of(params), params['hmac'])
       end
 
       def exchange(code, session)

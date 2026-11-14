@@ -14,7 +14,7 @@ module AnyAuth
 
       def request_phase(redirect_uri:, **params)
         state = SecureRandom.hex(24)
-        url = client.auth_code.authorize_url(redirect_uri:, state:, **authorize_params, **params)
+        url = client.auth_code.authorize_url(**authorize_params, **params, redirect_uri:, state:)
 
         Request.new(url:, session: { 'state' => state, 'redirect_uri' => redirect_uri })
       end
@@ -28,7 +28,7 @@ module AnyAuth
       end
 
       def expired?(credentials)
-        expires_at = credentials['expires_at'].to_s.to_time
+        expires_at = expiry_in(credentials.to_h.stringify_keys)
 
         expires_at.present? && expires_at.before?(2.minutes.from_now)
       end
@@ -38,9 +38,10 @@ module AnyAuth
       end
 
       def refresh!(credentials)
+        credentials = credentials.to_h.stringify_keys
         token = asking_the_vendor { OAuth2::AccessToken.from_hash(client, credentials).refresh(parse: :json) }
 
-        credentials.merge(credentials_from(token))
+        credentials.except('expires_at').merge(credentials_from(token))
       end
 
       private
@@ -69,10 +70,15 @@ module AnyAuth
       end
 
       def asked_with(token, path)
-        asking_the_vendor { token.get(path).parsed }
+        answer = asking_the_vendor { token.get(path).parsed }
+        return answer if answer.is_a?(Hash)
+
+        raise Unavailable, "#{provider} answered with something we cannot read"
       end
 
       def credentials_from(token)
+        raise Unauthorized, "#{provider} sent no access token" if token.token.blank?
+
         {
           'access_token' => token.token,
           'refresh_token' => token.refresh_token,
@@ -80,8 +86,17 @@ module AnyAuth
         }.compact
       end
 
+      def expiry_in(credentials)
+        case expires_at = credentials['expires_at']
+        when Numeric then Time.at(expires_at)
+        when String then expires_at.to_time(:utc) || Time.at(0)
+        end
+      rescue ArgumentError
+        Time.at(0)
+      end
+
       def client
-        @client ||= OAuth2::Client.new(client_id, client_secret, client_options) do
+        OAuth2::Client.new(client_id, client_secret, client_options) do
           it.request :url_encoded
           it.response :raise_error
         end
@@ -90,12 +105,17 @@ module AnyAuth
       def asking_the_vendor
         yield
       rescue OAuth2::Error => e
-        raise Unauthorized, "#{provider} refused us: #{e.message}"
+        raise Unauthorized, "#{provider} refused us (#{e.code || 'no token'})", cause: nil
       rescue Faraday::Error, JSON::ParserError => e
-        case e.try(:response_status)
-        when 400, 401, 403 then raise Unauthorized, "#{provider} refused us (#{e.response_status})"
-        when 429 then raise RateLimited, "#{provider} asked us to slow down"
-        else raise Unavailable, "#{provider} could not be reached (#{e.class.name.demodulize})"
+        raise error_for(e.try(:response_status)), "#{provider} could not be asked (#{e.class.name.demodulize})",
+          cause: nil
+      end
+
+      def error_for(status)
+        case status
+        when 400, 401, 403 then Unauthorized
+        when 429 then RateLimited
+        else Unavailable
         end
       end
     end

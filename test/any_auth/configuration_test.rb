@@ -69,14 +69,15 @@ module AnyAuth
       assert_raises(KeyError) { @config.strategy(:okta) }
     end
 
-    test 'a provider keeps the name it was configured under, and is only ever a strategy' do
-      @config.provider :file
-
+    test 'a provider keeps the name it was configured under' do
       assert_equal 'google', @config.strategy(:google, provider: 'another').provider
       assert_raises(ActiveModel::UnknownAttributeError) { @config.strategy(:google, scoop: 'email') }
       assert_raises(ActiveModel::UnknownAttributeError) { @config.strategy(:google, authorize_options: [:scoop]) }
-      assert_raises(NameError) { @config.strategy(:file) }
-      assert_raises(ArgumentError) { @config.provider :loop, from: :loop }
+    end
+
+    test 'a provider that is no strategy, or is made from one nobody configured, is refused where it is written' do
+      assert_raises(NameError) { @config.provider :file }
+      assert_raises(KeyError) { @config.provider :sheets, from: :nobody }
     end
   end
 end

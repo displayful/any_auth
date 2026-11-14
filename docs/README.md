@@ -17,7 +17,7 @@ back, and what is unusual about it.
 | [Shopify](strategies/shopify.md) | OAuth 2 with a field | a shop's Admin API |
 | [e-conomic](strategies/economic.md) | fields only | the e-conomic API |
 | [Adversus](strategies/adversus.md) | fields only | the Adversus API |
-| [Developer](strategies/developer.md) | fields only | signing in locally, with no vendor |
+| [Developer](strategies/developer.md) | a field and a trip to yourself | signing in locally, with no vendor |
 
 ## The three kinds
 
@@ -27,7 +27,7 @@ back, and what is unusual about it.
 - **OpenID Connect** strategies are OAuth 2 plus an answer to who signed in.
   They always ask for `openid`, send a nonce and a PKCE challenge, and read
   `auth.uid` and `auth.info` from the ID token.
-- **Fields-only** strategies have no round trip. The person types what the
+- **Fields-only** strategies (e-conomic, Adversus) have no round trip. The person types what the
   vendor gave them, and `strategy.attributes` is what you store.
 
 Every strategy answers `refresh(credentials)`, which renews what is about to

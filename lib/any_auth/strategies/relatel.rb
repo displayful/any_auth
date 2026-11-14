@@ -12,13 +12,13 @@ module AnyAuth
 
       private
 
-      def state_echoed?(_params, _session)
-        true
+      def state_echoed?(params, session)
+        params['state'].blank? || super
       end
 
       def identity(token, _session)
-        employee = asked_with(token, '/api/v2/employee').fetch('employee', {})
-        raise Unauthorized, 'relatel named no employee for this token' if employee['id'].blank?
+        employee = asked_with(token, '/api/v2/employee')['employee']
+        raise Unauthorized, 'relatel named no employee for this token' unless employee.is_a?(Hash) && employee['id']
 
         { uid: employee['id'].to_s, info: Info.new(name: employee['name'], email: employee['email']), raw: employee }
       end

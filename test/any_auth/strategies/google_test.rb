@@ -32,8 +32,35 @@ module AnyAuth
         assert_raises(Unauthorized) { auth(exp: 1.minute.ago.to_i) }
       end
 
+      test 'a token for another client, or for several without saying it is ours, is refused' do
+        assert_raises(Unauthorized) { auth(aud: 'another-app') }
+        assert_raises(Unauthorized) { auth(aud: %w[app another-app]) }
+        assert_raises(Unauthorized) { auth(aud: 'app', azp: 'another-app') }
+        assert_equal 'g-1', auth(aud: %w[app another-app], azp: 'app').uid
+      end
+
+      test 'a token whose payload says nothing we can read is refused' do
+        stub_request(:post, 'https://oauth2.googleapis.com/token')
+          .to_return(headers: { 'Content-Type' => 'application/json' },
+            body: { access_token: 'adgang', id_token: 'e30.WzFd.' }.to_json)
+
+        assert_raises(Unauthorized) do
+          Google.new(client_id: 'app', client_secret: 'tys').callback_phase({ 'code' => 'kode', 'state' => 's' },
+            { 'state' => 's', 'nonce' => 'n', 'redirect_uri' => 'https://tavle.test/callback' })
+        end
+      end
+
       test 'a token naming no subject is refused' do
         assert_raises(Unauthorized) { auth(sub: nil) }
+      end
+
+      test 'what the caller asks for cannot replace the state or the nonce' do
+        request = Google.new(client_id: 'app').request_phase(redirect_uri: 'https://tavle.test/callback',
+          state: 'mine', nonce: 'mine')
+        sent = Rack::Utils.parse_query(URI(request.url).query)
+
+        assert_equal request.session['state'], sent['state']
+        assert_equal request.session['nonce'], sent['nonce']
       end
 
       test 'leaving asks who the person is, and remembers the nonce and the verifier' do

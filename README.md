@@ -15,10 +15,13 @@ request = google.request_phase(redirect_uri: "https://app.test/auth/google/callb
 request.url       # send the person here
 request.session   # keep this until they come back
 
-auth = google.callback_phase(params, session)
+auth = google.callback_phase(request.query_parameters, stored)   # stored: request.session from before
 auth.uid          # "1184…"
 auth.info.email   # "mette@acme.test"
 ```
+
+Both arguments to `callback_phase` are string-keyed hashes. Pass
+`request.query_parameters`, not Rails' `params`.
 
 ## Why not OmniAuth
 
@@ -40,7 +43,7 @@ with the same named phases, and hands the flow back to your controllers.
 | `omniauth-rails_csrf_protection` | Nothing: the request phase is your own `POST` action |
 | A `setup` proc for per-request options | Build the strategy with what you know |
 | `OmniAuth.config.test_mode` and `mock_auth` | Canned HTTP answers through your real controllers |
-| A gem per vendor | A class per vendor, about fifteen lines |
+| A gem per vendor | A class per vendor: about twenty lines for plain OAuth 2 |
 
 ## Signing in with Google, start to finish
 
@@ -94,13 +97,28 @@ That is the whole integration. `redirect_to_provider` keeps the request in an
 encrypted, HTTP-only cookie for ten minutes and sends the person off;
 `authenticate_with_provider` reads it, removes it and answers the `auth`. Rails
 expires the cookie, so there is nothing to clean up, and no session is needed.
-The helpers need `cookies`, so an `ActionController::API` controller must
-include `ActionController::Cookies`, and the ten minutes are enforced by Rails
-only with `config.action_dispatch.use_cookies_with_metadata` on, as it is by
-default since Rails 6.
 The route constraint names the providers people may sign in with: the registry
 can also hold providers you only connect APIs through, and those must not get a
 sign-in address.
+
+Anything else you pass to `redirect_to_provider`, such as
+`return_to: params[:return_to]`, is kept with the request.
+`authenticate_with_provider` does not hand it back; to read it, take the
+request yourself, as the Shopify example below does.
+
+What the helpers need from your app:
+
+- Ruby 3.4 and Rails 8, with `secret_key_base` set, since the cookie is
+  encrypted.
+- `cookies`. An API-only app needs the `ActionDispatch::Cookies` middleware
+  and `ActionController::Cookies`.
+- The callback on the same host the person left from, arriving as a top-level
+  `GET`: the cookie is `SameSite=Lax` and bound to the host.
+- The button that starts it must not be a Turbo submission
+  (`data: { turbo: false }`), or the browser fetches the vendor's page in the
+  background and fails.
+- One sign-in per provider at a time in a browser: a second tab replaces the
+  first, and reloading the callback is an `InvalidCallback`.
 
 Each provider's request is kept under that provider's name, so a callback for
 one can never use a request that left for another. Pass `as:` to both helpers
@@ -119,7 +137,7 @@ builds one, and whatever you pass then wins over the entry.
 AnyAuth.configure do |config|
   config.provider :google, client_id: -> { ENV["GOOGLE_CLIENT_ID"] }, client_secret: -> { ENV["GOOGLE_CLIENT_SECRET"] }
 
-  # the same client, used for something else
+  # the same client, used for something else. A scope you set replaces "email profile"
   config.provider :google_drive, from: :google, scope: "https://www.googleapis.com/auth/drive.file"
 
   # the same code, with a client of its own
@@ -142,8 +160,10 @@ Each strategy declares which options are sent to the vendor when the person
 leaves: `scope` for every OAuth strategy; `access_type`, `prompt`, `hd` and
 `login_hint` for Google; `prompt`, `login_hint` and `domain_hint` for
 Microsoft. An option a strategy does not know is an
-`ActiveModel::UnknownAttributeError`, so a misspelling fails where you wrote
-it. To declare one in a strategy of your own, write `authorize_option :audience`.
+`ActiveModel::UnknownAttributeError` the first time that strategy is built. A
+strategy name that does not exist, or a `from:` nobody configured, fails
+straight away in the initializer. To declare an option in a strategy of your
+own, write `authorize_option :audience`.
 
 Key a person on `auth.provider` and `auth.uid`, never on the email. Link to an
 existing account by email only when `auth.info.email_verified` is true: it
@@ -159,7 +179,7 @@ The same two phases, with the scope you need. What you store is
 hubspot = AnyAuth::Strategies::Hubspot.new(client_id:, client_secret:)
 
 request = hubspot.request_phase(redirect_uri:, scope: "crm.objects.deals.read")
-auth    = hubspot.callback_phase(params, session)
+auth    = hubspot.callback_phase(request.query_parameters, stored)
 
 auth.credentials
 # => { "access_token" => "…", "refresh_token" => "…", "expires_at" => "2026-11-13T10:00:00Z" }
@@ -182,6 +202,11 @@ save(credentials)
 | `refresh(credentials)` | renews when `expired?`, and answers the credentials either way |
 | `refresh!(credentials)` | asks the vendor for a new token now |
 
+Credentials are the hash `auth.credentials` gave you. `expires_at` may be the
+text it wrote or a number of seconds, and string or symbol keys both work.
+Expired credentials with no refresh token cannot be renewed: that is an
+`AnyAuth::Unauthorized`, and the person has to sign in again.
+
 What comes back is the whole hash, with a refresh token the vendor did not
 replace kept in place. A vendor that rotates its refresh token, as Shopify
 does, must not be refreshed twice at once: check `expired?`, take a lock or
@@ -195,7 +220,7 @@ types. Shopify needs the shop before it can build an address:
 
 ```ruby
 shopify = AnyAuth.strategy(:shopify, shop: "mystore")
-shopify.valid?   # false, with errors on :shop, for anything that is not a shop
+shopify.valid?   # true. False, with an error on :shop, for anything that is not a shop
 shopify.shop     # "mystore.myshopify.com"
 ```
 
@@ -281,13 +306,23 @@ class ShopsController < ApplicationController
 end
 ```
 
-What you store is the fields and the tokens together. Building the strategy
-from that hash later gives you both `shopify.shop` and working credentials.
+What you store is the fields and the tokens together. Later, build the
+strategy from the fields in that hash and hand the whole hash to `refresh`:
+
+```ruby
+stored  = shop.credentials
+shopify = AnyAuth.strategy(:shopify, stored.slice(*AnyAuth.strategy_class(:shopify).attribute_names))
+shop.update!(credentials: shopify.refresh(stored))
+```
+
+A strategy refuses to go anywhere on a shop that is not one: `request_phase`
+raises `ArgumentError` if you skipped `valid?`.
 
 ### Fields and no round trip
 
 Some vendors have you paste a token or a login from their settings page.
-Those strategies inherit from `Base`. Show the same form, check `valid?`, and
+Those strategies (`Economic`, `Adversus`) have no phases at all, so do not pass
+them to `redirect_to_provider`. Show the same form, check `valid?`, and
 store `strategy.attributes`. To find out whether the vendor accepts what was
 typed, call its API once with them before you save.
 
@@ -299,12 +334,12 @@ typed, call its API once with them before you save.
 | --- | --- |
 | `auth.provider` | the name the provider is configured under: `"google"`, `"shopify"` |
 | `auth.uid` | who signed in, as the vendor identifies them. Stable; key a person on it |
-| `auth.info` | what is known about them, or nil when the vendor says nothing |
+| `auth.info` | what is known about them. Always there; empty when the vendor says nothing |
 | `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` when the vendor sends them |
 | `auth.raw` | what the vendor said, as it said it: the ID token's claims, or its answer about the account |
 
 `auth.info` is an `AnyAuth::Info` with the same four members for every vendor.
-Each is nil when the vendor does not say:
+Each is nil when the vendor does not say, except `email_verified`, which is then false:
 
 | | |
 | --- | --- |
@@ -331,15 +366,17 @@ two colleagues signing in to the same portal are the same connection. Each
 
 ## Errors
 
-Everything raised is an `AnyAuth::Error`. Rescue that one class, or tell them
-apart:
+Everything a vendor or a callback can cause is an `AnyAuth::Error`. Rescue that
+one class, or tell them apart. Mistakes in your own setup are ordinary Ruby
+errors: an unconfigured provider name is a `KeyError`, an unknown option an
+`ActiveModel::UnknownAttributeError`.
 
 | Error | Means | Usually |
 | --- | --- | --- |
 | `InvalidCallback` | the callback is not ours: wrong state, no code, a bad signature | start again |
-| `Declined` | the vendor sent `error=`; `code` is what it sent | show why |
-| `Unauthorized` | the vendor refused the code swap, the refresh or the ID token | sign in again |
-| `Unavailable` | the vendor could not be reached, or answered nonsense | retry later |
+| `Declined` | the vendor sent `error=` on a callback that is ours; `code` is what it sent | show why |
+| `Unauthorized` | the vendor refused the code swap, the refresh, the who-is-this request or the ID token | sign in again |
+| `Unavailable` | any other failure: a timeout, a server error, an answer we cannot read | retry later |
 | `RateLimited` | an `Unavailable` that asks you to slow down | retry later |
 
 ## Strategies included
@@ -351,15 +388,21 @@ configure, what the vendor needs, what comes back and what is unusual.
 | --- | --- | --- |
 | [`Google`](docs/strategies/google.md) | OpenID Connect | links by email for Gmail and Workspace addresses |
 | [`Microsoft`](docs/strategies/microsoft.md) | OpenID Connect | work, school and personal accounts; `uid` is tenant and object id |
-| [`Hubspot`](docs/strategies/hubspot.md) | OAuth 2 | |
+| [`Hubspot`](docs/strategies/hubspot.md) | OAuth 2 | one more request, to name the user |
 | [`Relatel`](docs/strategies/relatel.md) | OAuth 2 | the vendor echoes no state |
 | [`Shopify`](docs/strategies/shopify.md) | OAuth 2 with a field | per-shop endpoints, signed callback, expiring tokens |
 | [`Economic`](docs/strategies/economic.md), [`Adversus`](docs/strategies/adversus.md) | fields only | pasted tokens or a login |
-| [`Developer`](docs/strategies/developer.md) | fields only | type an email and be that person; for development only |
+| [`Developer`](docs/strategies/developer.md) | a field and a trip to yourself | type an email and be that person; for development only |
 
-Register `Developer` only where it is safe, for example
-`config.provider :developer if Rails.env.development?`. It goes through the
-same two phases as the others, coming straight back to your callback.
+`Developer` is not loaded unless you ask for it. Require it and register it
+only where it is safe:
+
+```ruby
+if Rails.env.development?
+  require "any_auth/strategies/developer"
+  config.provider :developer
+end
+```
 
 ## Writing a strategy
 
@@ -378,7 +421,9 @@ end
 ```
 
 `client_options` takes the same keys as an OmniAuth OAuth 2 strategy, so
-porting one starts with copying that hash.
+porting one starts with copying that hash. A class of your own can live
+anywhere in your app: register it with `config.provider :pipedrive, strategy:
+Pipedrive, …`. A symbol is looked up among the gem's strategies.
 
 When a vendor is unusual, override only the step that differs and call
 `super`:
@@ -395,6 +440,47 @@ For a vendor people sign in with, inherit from `OpenIDConnect` and answer
 are checked before it is called; checking the issuer is that method's job,
 since vendors name theirs differently.
 
+## Coming from OmniAuth
+
+- **Provider names are yours.** `config.provider :google_oauth2, strategy:
+  :google` keeps the values already in your `provider` column and the callback
+  addresses already registered with the vendor.
+- **Check `uid` before you switch.** Google's is the `sub`, as
+  omniauth-google-oauth2 uses. Microsoft's is `<tenant id>:<object id>`,
+  HubSpot's the user id and Relatel's the employee id; compare them with what
+  your OmniAuth gems stored, since existing rows may need rewriting.
+- **`auth` is an object, not a hash.** `auth.uid`, not `auth["uid"]`.
+- **`credentials` has other keys:** `access_token` where OmniAuth has `token`,
+  `expires_at` as ISO 8601 text, and no `expires`.
+- **`extra.raw_info` is `auth.raw`.** `info` has `name`, `email`,
+  `email_verified` and `image` only.
+- **`omniauth.origin` and `omniauth.params`** become the extras you pass to
+  `redirect_to_provider`.
+- **A person cancelling at the vendor** is an `AnyAuth::Declined`.
+
+## Testing
+
+There is no test mode. Stub the vendor's HTTP answers and drive your real
+controllers:
+
+```ruby
+post auth_path(:google)
+sent = Rack::Utils.parse_query(URI(response.location).query)
+
+claims = { sub: "g-1", email: "mette@gmail.com", email_verified: true,
+           iss: "https://accounts.google.com", aud: "your-client-id",
+           exp: 1.hour.from_now.to_i, nonce: sent["nonce"] }
+stub_request(:post, "https://oauth2.googleapis.com/token").to_return(
+  headers: { "Content-Type" => "application/json" },
+  body: { access_token: "token", id_token: JWT.encode(claims, nil, "none") }.to_json
+)
+
+get auth_callback_path(:google, code: "code", state: sent["state"])
+```
+
+The ID token can be unsigned in a test, because the gem reads it from the
+token endpoint and does not check its signature.
+
 ## What it does not do
 
 - **SAML, OAuth 1, or callbacks that arrive as a cross-site `POST`** (Sign in
@@ -404,7 +490,8 @@ since vendors name theirs differently.
   expiry, nonce and issuer; its signature is not verified, which OpenID Connect
   allows for that path only. A token that reaches you through the browser must
   not be trusted this way.
-- **A profile.** `info` is an email and whether it is vouched for. Ask the
+- **A full profile.** `info` is a name, an email, whether the email is vouched
+  for, and a picture. Ask the
   vendor's API for anything more.
 - **Your user model, your session or your routes.** Those stay yours.
 

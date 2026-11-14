@@ -26,6 +26,15 @@ module AnyAuth
         assert_includes shopify.errors.attribute_names, :shop
       end
 
+      test 'a shop that is not a shop is never sent anywhere' do
+        assert_raises(ArgumentError) do
+          Shopify.new(shop: 'evil.test', client_id: 'app').request_phase(redirect_uri: 'https://tavle.test/callback')
+        end
+        assert_raises(ArgumentError) do
+          Shopify.new(client_id: 'app').request_phase(redirect_uri: 'https://tavle.test/callback')
+        end
+      end
+
       test 'signing in happens at the shop itself' do
         request = Shopify.new(shop: 'mystore', client_id: 'app').request_phase(redirect_uri: 'https://tavle.test/callback')
 
@@ -50,6 +59,10 @@ module AnyAuth
         ours = Shopify.new(shop: 'some-shop', client_secret: 'hush')
 
         assert_raises(InvalidCallback) { ours.callback_phase(SIGNED.merge('code' => 'changed'), HELD) }
+        assert_raises(InvalidCallback) { ours.callback_phase(SIGNED.merge('code' => [SIGNED['code']]), HELD) }
+        assert_raises(InvalidCallback) do
+          Shopify.new(shop: 'some-shop', client_secret: 'another').callback_phase(SIGNED, HELD)
+        end
         assert_raises(InvalidCallback) { ours.callback_phase(SIGNED, HELD.merge('state' => 'another')) }
         assert_raises(InvalidCallback) { Shopify.new(shop: 'some-shop').callback_phase(SIGNED, HELD) }
         assert_raises(InvalidCallback) do

@@ -8,9 +8,9 @@ their behalf, or both.
 ```ruby
 config.provider :google, client_id: ENV["GOOGLE_CLIENT_ID"], client_secret: ENV["GOOGLE_CLIENT_SECRET"]
 
-# the same client, asking for a Google API as well
+# the same client, asking for a Google API. Keep "email profile" if you also want auth.info
 config.provider :google_drive, from: :google,
-  scope: "https://www.googleapis.com/auth/drive.file", access_type: "offline", prompt: "consent"
+  scope: "email profile https://www.googleapis.com/auth/drive.file", access_type: "offline", prompt: "consent"
 ```
 
 | Option | Sent to Google | Notes |
@@ -46,7 +46,8 @@ mailbox. Link an existing account by email only when this is true.
 
 The ID token is read from the token endpoint and checked for audience (your
 client id), expiry, the nonce sent with this request, and issuer
-(`accounts.google.com`). A token that fails is an `AnyAuth::Unauthorized`.
+(`accounts.google.com`). A token issued for several clients must say it is
+for yours (`azp`). A token that fails is an `AnyAuth::Unauthorized`.
 
 ## Calling the API
 

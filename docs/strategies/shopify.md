@@ -25,6 +25,8 @@ Whatever the person types is turned into the shop's `myshopify.com` address:
 
 `valid?` accepts only `<name>.myshopify.com`. It does not ask Shopify whether
 the shop exists; a shop that does not exist answers 404 on its sign-in address.
+Every phase raises `ArgumentError` on a shop that is not valid, so a forgotten
+`valid?` cannot send anyone to another host.
 
 See [the README](../../README.md#vendors-that-ask-for-something-first) for the
 form and the controller: the shop has to travel with the request, because the
@@ -55,7 +57,7 @@ a bearer token.
 | | |
 | --- | --- |
 | `auth.uid` | the shop's `myshopify.com` domain. An offline token belongs to the shop, not to a person, so the shop is who signed in |
-| `auth.info` | nil |
+| `auth.info` | empty |
 | `auth.credentials` | `access_token`, `refresh_token`, `expires_at` |
 | `auth.raw` | what Shopify sent with the token, such as the granted `scope` |
 

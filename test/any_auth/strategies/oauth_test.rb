@@ -33,6 +33,29 @@ module AnyAuth
         assert_equal 8823, auth.raw['hub_id']
       end
 
+      test 'an answer about the user that is no answer is the vendor being unavailable, and keeps the token to itself' do
+        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
+          .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
+        lookup = stub_request(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/ny')
+
+        lookup.to_return(headers: { 'Content-Type' => 'text/html' }, body: '<html>')
+
+        assert_raises(Unavailable) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
+
+        lookup.to_return(status: 401)
+        refused = assert_raises(Unauthorized) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
+
+        assert_nil refused.cause
+        assert_not_includes refused.message, 'ny'
+      end
+
+      test 'a token answer with no access token is no sign-in' do
+        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
+          .to_return(headers: { 'Content-Type' => 'application/json' }, body: { refresh_token: 'igen' }.to_json)
+
+        assert_raises(Unauthorized) { hubspot.callback_phase({ 'code' => 'kode', 'state' => 's' }, HELD) }
+      end
+
       test 'a token HubSpot will not name a user for is no sign-in' do
         stub_request(:post, 'https://api.hubapi.com/oauth/v1/token')
           .to_return(headers: { 'Content-Type' => 'application/json' }, body: { access_token: 'ny' }.to_json)
@@ -103,6 +126,9 @@ module AnyAuth
         auth = Relatel.new(client_id: 'app', client_secret: 'tys').callback_phase({ 'code' => 'kode' }, HELD)
 
         assert_requested swap
+        assert_raises(InvalidCallback) do
+          Relatel.new(client_id: 'app', client_secret: 'tys').callback_phase({ 'code' => 'kode', 'state' => 'x' }, HELD)
+        end
         assert_equal '34', auth.uid
         assert_equal 'Mette Holm', auth.info.name
         assert_equal 8823, auth.raw['company_id']
