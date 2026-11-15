@@ -70,11 +70,7 @@ class Auth::BaseController < ApplicationController
 
   private
     def set_strategy
-      if Identity.provider?(params[:provider])
-        @strategy = AnyAuth.strategy(params[:provider])
-      else
-        head :not_found
-      end
+      @strategy = AnyAuth.strategy(params[:provider])
     end
 
     def refused
@@ -119,19 +115,6 @@ the vendor leaves it there.
 ### 5. Find the person
 
 ```ruby
-# app/models/identity.rb
-class Identity < ApplicationRecord
-  PROVIDERS = %w[ google microsoft ]
-
-  belongs_to :user
-
-  def self.provider?(name)
-    name.in?(PROVIDERS)
-  end
-end
-```
-
-```ruby
 # app/models/user.rb
 class User < ApplicationRecord
   has_many :sessions, dependent: :destroy
@@ -149,9 +132,8 @@ class User < ApplicationRecord
 end
 ```
 
-`Identity::PROVIDERS` is the list of providers people sign in with; any other
-name is a 404, so a provider configured for an API (below) cannot be used to
-sign in. Key a person on `provider` and `uid`. Link to an existing account by
+Key a person on `provider` and `uid`, in an `Identity` that belongs to the
+user. Link to an existing account by
 email only when `auth.info.email_verified` is true: AnyAuth sets it only when
 the vendor can vouch for the mailbox, which is stricter than the vendor's own
 flag (see [Google](docs/strategies/google.md) and

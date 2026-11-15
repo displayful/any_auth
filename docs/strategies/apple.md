@@ -62,8 +62,7 @@ end
 
 Skipping forgery protection is safe for that one action: it changes nothing,
 and the state is still checked against the session on the `GET`. The routes
-and controllers are the ones in the [README](../../README.md#3-add-the-routes);
-add `apple` to the providers people sign in with.
+and controllers are the ones in the [README](../../README.md#3-add-the-routes).
 
 ## What comes back
 
