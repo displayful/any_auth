@@ -18,24 +18,21 @@ require 'oauth2'
 
 module AnyAuth
   class Error < StandardError
-    attr_reader :code
+    attr_reader :code, :description, :retry_after
 
-    def initialize(message = nil, code: nil)
+    def initialize(message = nil, code: nil, description: nil, retry_after: nil)
       @code = code
+      @description = description
+      @retry_after = retry_after
       super(message)
     end
   end
 
-  class InvalidCallback < Error; end
-  class Unauthorized < Error; end
-  class Unavailable < Error; end
-  class RateLimited < Unavailable; end
-
-  class Declined < Error
-    def initialize(code)
-      super("Sign-in declined (#{code})", code:)
-    end
-  end
+  class AuthenticationError < Error; end
+  class InvalidCallback < AuthenticationError; end
+  class AccessDenied < AuthenticationError; end
+  class Unavailable < AuthenticationError; end
+  class ConfigurationError < Error; end
 
   def self.configuration
     @configuration ||= Configuration.new

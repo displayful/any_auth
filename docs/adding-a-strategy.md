@@ -34,7 +34,7 @@ module AnyAuth
 
       def identity(access_token, _session)
         user = get(access_token, "/v1/users/me")["data"]
-        raise Unauthorized, "#{provider} returned no user" if user.blank?
+        raise AccessDenied, "#{provider} returned no user" if user.blank?
 
         {
           uid: user["id"].to_s,
@@ -137,7 +137,7 @@ config.provider :twitter, strategy: Twitter, consumer_key: "…", consumer_secre
 - Leaving asks the vendor for a request token, so `redirect_to_provider` makes
   an HTTP request; a vendor that is down raises `Unavailable` there.
 - The callback must carry the request token we were given (OAuth 1's state),
-  and `denied` with it is `Declined`.
+  and `denied` with it is `AccessDenied`.
 - `auth.credentials` is `{ "token", "secret" }`, as in OmniAuth. They do not
   expire, so `refresh` returns them unchanged.
 - The oauth gem talks HTTP through `Net::HTTP`, which WebMock stubs as usual.
@@ -195,10 +195,41 @@ applies.
 | `identity(access_token, session)` | nothing for `OAuth2`; reads the ID token for `OpenIDConnect` | saying who signed in |
 | `request_phase` / `callback_phase` | the whole flow | a vendor that differs throughout (Apple adds `response_mode`, `Developer` never leaves) |
 
-Raise AnyAuth's errors, not your own: `InvalidCallback` when the callback is
-not ours, `Unauthorized` when the vendor refused or named nobody,
-`Unavailable` when it could not answer. Keep tokens and vendor bodies out of
-messages, and raise with `cause: nil` if you rescue something that holds them.
+## Errors
+
+Raise `InvalidCallback` for your own checks that the answer is ours (a
+signature, a shop), `AccessDenied` when the vendor names nobody, and
+`ArgumentError` for a missing setting. Everything the vendor says goes through
+one method, `error_from(status, body, headers)`, which reads the vendor's code
+first and then the HTTP status. Never pick a class from a status yourself.
+
+A vendor with its own error shape overrides up to three private methods:
+
+| Method | Default | Override when |
+| --- | --- | --- |
+| `error_code(body)` | `body['error']` | the vendor names its error elsewhere |
+| `error_description(body)` | `body['error_description']` | the same, for its explanation |
+| `error_class_for(code, status)` | the OAuth codes, then the status | one of its own codes means a setup mistake or an outage |
+
+HubSpot's token endpoint answers `{"status": "BAD_REFRESH_TOKEN", "message": "…"}`
+with a 400, so its strategy says only where those are; the 400 makes it an
+`AccessDenied`:
+
+```ruby
+def error_code(body)
+  super || body['status']
+end
+
+def error_description(body)
+  super || body['message']
+end
+```
+
+A vendor that hides an error inside a 200 from its own API raises it the same
+way: `raise error_from(nil, answer) unless answer['ok']`.
+
+Keep tokens and vendor bodies out of messages, and raise with `cause: nil` if
+you rescue something that holds them.
 
 ## Testing a strategy
 

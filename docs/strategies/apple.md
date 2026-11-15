@@ -84,7 +84,7 @@ existing account by email will not find a person who hides theirs.
 The ID token is read from the token endpoint and checked for audience (your
 Services ID), expiry, the nonce sent with this request, and issuer
 (`https://appleid.apple.com`). A token that fails is an
-`AnyAuth::Unauthorized`. The name in `user` is not signed, so treat it as
+`AnyAuth::InvalidCallback`. The name in `user` is not signed, so treat it as
 what the person typed.
 
 No PKCE challenge is sent. Apple documents no `code_challenge` on its

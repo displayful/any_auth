@@ -29,11 +29,11 @@ module AnyAuth
       end
 
       test 'a token issued by another tenant than the one it names is refused' do
-        assert_raises(Unauthorized) { auth(oid: 'o-1', iss: issuer(PERSONAL)) }
+        assert_raises(InvalidCallback) { auth(oid: 'o-1', iss: issuer(PERSONAL)) }
       end
 
       test 'a tenant that is not a tenant id is refused' do
-        assert_raises(Unauthorized) { auth(oid: 'o-1', tid: 'common', iss: issuer('common')) }
+        assert_raises(InvalidCallback) { auth(oid: 'o-1', tid: 'common', iss: issuer('common')) }
       end
 
       private

@@ -40,11 +40,11 @@ module AnyAuth
         assert_not hubspot.expired?(renewed)
       end
 
-      test 'a renewal the vendor refuses, or that has no refresh token to offer, is Unauthorized' do
+      test 'a renewal the vendor refuses, or that has no refresh token to offer, is AccessDenied' do
         stub_request(:post, TOKEN_URL).to_return(status: 400, body: 'invalid_grant')
 
-        assert_raises(Unauthorized) { hubspot.refresh!(expiring(1.minute.ago)) }
-        assert_raises(Unauthorized) { hubspot.refresh!({}) }
+        assert_raises(AccessDenied) { hubspot.refresh!(expiring(1.minute.ago)) }
+        assert_raises(AccessDenied) { hubspot.refresh!({}) }
       end
 
       test 'credentials count as expired two minutes early' do

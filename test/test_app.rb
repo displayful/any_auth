@@ -21,6 +21,14 @@ TestApp.routes.draw do
     get 'callback', action: :callback
   end
 
+  get 'auth/failure', to: 'any_auth/failure_redirect_test/failures#show', as: :auth_failure
+
+  scope 'failing/:provider', controller: 'any_auth/failure_redirect_test/failures' do
+    get 'denied', action: :denied
+    get 'forged', action: :forged
+    get 'misconfigured', action: :misconfigured
+  end
+
   scope ':provider', controller: 'any_auth/controller_helpers_test/sign_ins' do
     post 'leave', action: :create
     get 'home', action: :show

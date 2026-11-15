@@ -33,8 +33,8 @@ module AnyAuth
       end
 
       test 'a token from another issuer, or naming nobody, is refused' do
-        assert_raises(Unauthorized) { auth(iss: 'https://evil.test') }
-        assert_raises(Unauthorized) { auth(sub: nil) }
+        assert_raises(InvalidCallback) { auth(iss: 'https://evil.test') }
+        assert_raises(InvalidCallback) { auth(sub: nil) }
       end
 
       private

@@ -24,10 +24,25 @@ module AnyAuth
         assert_nil auth.raw['token']
       end
 
-      test 'a token HubSpot names no user for is Unauthorized' do
+      test "a refresh HubSpot refuses carries HubSpot's own code and message" do
+        refusal = { status: 'BAD_REFRESH_TOKEN', message: 'missing or invalid refresh token' }
+        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token').to_return(
+          status: 400,
+          headers: { 'Content-Type' => 'application/json' },
+          body: refusal.to_json
+        )
+        hubspot = Hubspot.new(client_id: 'app', client_secret: 'secret')
+
+        refused = assert_raises(AccessDenied) { hubspot.refresh!('refresh_token' => 'old') }
+
+        assert_equal 'BAD_REFRESH_TOKEN', refused.code
+        assert_equal 'missing or invalid refresh token', refused.description
+      end
+
+      test 'a token HubSpot names no user for is AccessDenied' do
         stub_json(:get, TOKEN_INFO_URL, message: 'unknown token')
 
-        assert_raises(Unauthorized) { come_home }
+        assert_raises(AccessDenied) { come_home }
       end
 
       test 'an answer that cannot be read is Unavailable' do
@@ -42,7 +57,7 @@ module AnyAuth
       test 'a refusal never repeats the token that was in the address' do
         stub_request(:get, TOKEN_INFO_URL).to_return(status: 401)
 
-        refused = assert_raises(Unauthorized) { come_home }
+        refused = assert_raises(AccessDenied) { come_home }
 
         assert_nil refused.cause
         assert_not_includes refused.message, 'new'

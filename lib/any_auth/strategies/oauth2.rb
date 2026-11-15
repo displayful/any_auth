@@ -69,7 +69,7 @@ module AnyAuth
       def verify(params, session)
         raise InvalidCallback, 'No sign-in in progress' if session['redirect_uri'].blank?
         raise InvalidCallback, 'Invalid state' unless valid_state?(params, session)
-        raise Declined, params['error'] if params['error'].present?
+        raise error_from(nil, params) if error_code(params).present?
         raise InvalidCallback, 'Missing code' if params['code'].blank?
       end
 
@@ -91,7 +91,7 @@ module AnyAuth
       end
 
       def credentials_from(access_token)
-        raise Unauthorized, "#{provider} returned no access token" if access_token.token.blank?
+        raise AccessDenied, "#{provider} returned no access token" if access_token.token.blank?
 
         {
           'access_token' => access_token.token,
@@ -124,10 +124,13 @@ module AnyAuth
       end
 
       def vendor_error(error)
-        status = error.response.try(:status)
-        message = "#{provider} returned #{error.code || status || 'no token'}"
+        response = error.response
+        return error_from(nil, {}) unless response.is_a?(::OAuth2::Response)
 
-        error_class_for(status).new(message, code: error.code)
+        body = response.parsed
+        body = {} unless body.is_a?(Hash)
+
+        error_from(response.status, body, response.headers)
       end
     end
   end

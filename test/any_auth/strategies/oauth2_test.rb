@@ -37,28 +37,28 @@ module AnyAuth
         assert_raises(InvalidCallback) { hubspot.callback_phase(without_code, stored_session) }
       end
 
-      test 'a person who declined at the vendor is Declined, with what the vendor called it' do
+      test 'a person who declined at the vendor is AccessDenied, with what the vendor called it' do
         answer = { 'error' => 'access_denied', 'state' => 's' }
 
-        declined = assert_raises(Declined) { hubspot.callback_phase(answer, stored_session) }
+        declined = assert_raises(AccessDenied) { hubspot.callback_phase(answer, stored_session) }
 
         assert_equal 'access_denied', declined.code
       end
 
-      test 'a swap the vendor refuses, or answers without a token, is Unauthorized' do
+      test 'a swap the vendor refuses, or answers without a token, is AccessDenied' do
         stub_request(:post, TOKEN_URL).to_return(status: 400, body: 'invalid_grant')
 
-        assert_raises(Unauthorized) { hubspot.callback_phase(callback_params, stored_session) }
+        assert_raises(AccessDenied) { hubspot.callback_phase(callback_params, stored_session) }
 
         stub_json(:post, TOKEN_URL, refresh_token: 'refresh')
 
-        assert_raises(Unauthorized) { hubspot.callback_phase(callback_params, stored_session) }
+        assert_raises(AccessDenied) { hubspot.callback_phase(callback_params, stored_session) }
       end
 
       test "a refusal carries the vendor's reason" do
         stub_json(:post, TOKEN_URL, status: 400, error: 'invalid_grant')
 
-        refused = assert_raises(Unauthorized) do
+        refused = assert_raises(AccessDenied) do
           hubspot.callback_phase(callback_params, stored_session)
         end
 
@@ -84,10 +84,55 @@ module AnyAuth
         assert_raises(Unavailable) { hubspot.callback_phase(callback_params, stored_session) }
       end
 
-      test 'a vendor that throttles us is RateLimited' do
-        stub_request(:post, TOKEN_URL).to_return(status: 429)
+      test 'a vendor that throttles us is Unavailable, and says when to try again' do
+        stub_request(:post, TOKEN_URL).to_return(status: 429, headers: { 'Retry-After' => '30' })
 
-        assert_raises(RateLimited) { hubspot.refresh!('refresh_token' => 'refresh') }
+        throttled = assert_raises(Unavailable) { hubspot.refresh!('refresh_token' => 'refresh') }
+
+        assert_equal 30, throttled.retry_after
+      end
+
+      test 'a wait given as a date is read as seconds from now' do
+        later = 2.minutes.from_now.httpdate
+        stub_request(:post, TOKEN_URL).to_return(status: 503, headers: { 'Retry-After' => later })
+
+        throttled = assert_raises(Unavailable) { hubspot.refresh!('refresh_token' => 'refresh') }
+
+        assert_in_delta 120, throttled.retry_after, 2
+      end
+
+      test 'a callback the vendor answers with an outage is Unavailable, not a refusal' do
+        answer = { 'error' => 'temporarily_unavailable', 'state' => 's' }
+
+        assert_raises(Unavailable) { hubspot.callback_phase(answer, stored_session) }
+      end
+
+      test "a customer's policy refusing the app is AccessDenied, with the vendor's reason" do
+        answer = { 'error' => 'unauthorized_client', 'error_description' => 'Not allowed',
+                   'state' => 's' }
+
+        refused = assert_raises(AccessDenied) { hubspot.callback_phase(answer, stored_session) }
+
+        assert_equal 'unauthorized_client', refused.code
+        assert_equal 'Not allowed', refused.description
+      end
+
+      test 'a vendor saying our client is wrong is a ConfigurationError, which raises' do
+        stub_json(:post, TOKEN_URL, status: 401, error: 'invalid_client')
+
+        misconfigured = assert_raises(ConfigurationError) do
+          hubspot.callback_phase(callback_params, stored_session)
+        end
+
+        assert_equal 'invalid_client', misconfigured.code
+        assert_kind_of AnyAuth::Error, misconfigured
+        assert_not_kind_of AuthenticationError, misconfigured
+      end
+
+      test 'a refusal from the oauth2 gem itself carries no vendor code' do
+        refused = assert_raises(AccessDenied) { hubspot.refresh!({}) }
+
+        assert_nil refused.code
       end
 
       test 'the client is named in the request body, unless the strategy asks for another scheme' do

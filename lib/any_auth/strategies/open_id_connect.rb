@@ -20,18 +20,18 @@ module AnyAuth
 
       def identity(access_token, session)
         claims = decode_id_token(access_token)
-        raise Unauthorized, 'Invalid ID token' unless valid_claims?(claims, session)
+        raise InvalidCallback, 'Invalid ID token' unless valid_claims?(claims, session)
 
         identity_from(claims).merge(raw: claims)
       end
 
       def decode_id_token(access_token)
         claims = JWT.decode(access_token.params['id_token'], nil, false).first
-        raise Unauthorized, 'Invalid ID token' unless claims.is_a?(Hash)
+        raise InvalidCallback, 'Invalid ID token' unless claims.is_a?(Hash)
 
         claims
       rescue JWT::DecodeError
-        raise Unauthorized, 'Invalid ID token'
+        raise InvalidCallback, 'Invalid ID token'
       end
 
       def identity_from(claims)
@@ -70,7 +70,7 @@ module AnyAuth
 
       def fetch_claim(claims, name)
         value = claims[name]
-        raise Unauthorized, "Missing #{name} claim" unless value.is_a?(String) && value.present?
+        raise InvalidCallback, "Missing #{name} claim" unless value.is_a?(String) && value.present?
 
         value
       end

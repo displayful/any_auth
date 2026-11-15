@@ -40,26 +40,26 @@ module AnyAuth
       end
 
       test 'a token for another sign-in, or that has expired, is refused' do
-        assert_raises(Unauthorized) { come_home_with(nonce: 'another') }
-        assert_raises(Unauthorized) { come_home_with(nonce: nil) }
-        assert_raises(Unauthorized) { come_home_with(exp: 1.minute.ago.to_i) }
+        assert_raises(InvalidCallback) { come_home_with(nonce: 'another') }
+        assert_raises(InvalidCallback) { come_home_with(nonce: nil) }
+        assert_raises(InvalidCallback) { come_home_with(exp: 1.minute.ago.to_i) }
       end
 
       test 'a token for another client, or for several without saying it is ours, is refused' do
-        assert_raises(Unauthorized) { come_home_with(aud: 'another-app') }
-        assert_raises(Unauthorized) { come_home_with(aud: %w[app another-app]) }
-        assert_raises(Unauthorized) { come_home_with(aud: 'app', azp: 'another-app') }
+        assert_raises(InvalidCallback) { come_home_with(aud: 'another-app') }
+        assert_raises(InvalidCallback) { come_home_with(aud: %w[app another-app]) }
+        assert_raises(InvalidCallback) { come_home_with(aud: 'app', azp: 'another-app') }
         assert_equal 'g-1', come_home_with(aud: %w[app another-app], azp: 'app').uid
       end
 
       test 'an answer with no ID token, or one that cannot be read, names nobody' do
         stub_json(:post, TOKEN_URL, access_token: 'access')
 
-        assert_raises(Unauthorized) { come_home }
+        assert_raises(InvalidCallback) { come_home }
 
         stub_json(:post, TOKEN_URL, access_token: 'access', id_token: 'not-a-token')
 
-        assert_raises(Unauthorized) { come_home }
+        assert_raises(InvalidCallback) { come_home }
       end
 
       test 'a strategy that names no issuer is an error, not a sign-in' do

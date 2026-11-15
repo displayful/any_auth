@@ -17,7 +17,7 @@ module AnyAuth
 
       def identity(access_token, _session)
         employee = get(access_token, '/api/v2/employee')['employee'] || {}
-        raise Unauthorized, "#{provider} returned no employee" if employee['id'].blank?
+        raise AccessDenied, "#{provider} returned no employee" if employee['id'].blank?
 
         {
           uid: employee['id'].to_s,

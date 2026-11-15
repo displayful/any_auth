@@ -44,7 +44,7 @@ module AnyAuth
         request_token = session['request_token']
 
         raise InvalidCallback, 'No sign-in in progress' if request_token.blank?
-        raise Declined, 'denied' if secure_compare(request_token, params['denied'])
+        raise AccessDenied, 'Sign-in denied' if secure_compare(request_token, params['denied'])
         raise InvalidCallback, 'Invalid oauth_token' unless valid_token?(request_token, params)
         raise InvalidCallback, 'Missing oauth_verifier' if params['oauth_verifier'].blank?
       end
@@ -70,9 +70,7 @@ module AnyAuth
 
       def get(access_token, path)
         response = with_error_handling { access_token.get(path) }
-        unless response.is_a?(Net::HTTPSuccess)
-          raise error_class_for(response.code.to_i), "#{provider} returned #{response.code}"
-        end
+        raise vendor_error(response) unless response.is_a?(Net::HTTPSuccess)
 
         body = JSON.parse(response.body)
         raise Unavailable, "#{provider} returned an unreadable response" unless body.is_a?(Hash)
@@ -85,11 +83,37 @@ module AnyAuth
       def with_error_handling
         yield
       rescue ::OAuth::Unauthorized => e
-        status = e.request&.code.to_i
-        raise error_class_for(status), "#{provider} returned #{status}", cause: nil
-      rescue Net::HTTPExceptions, Timeout::Error, SystemCallError, SocketError,
-             OpenSSL::SSL::SSLError => e
+        raise vendor_error(e.request), cause: nil
+      rescue Net::HTTPExceptions => e
+        raise vendor_error(e.response), cause: nil
+      rescue Timeout::Error, SystemCallError, SocketError, OpenSSL::SSL::SSLError => e
         raise Unavailable, "#{provider} request failed (#{e.class.name.demodulize})", cause: nil
+      end
+
+      def vendor_error(response)
+        body = CGI.parse(response.body.to_s).transform_values(&:first)
+
+        error_from(response.code.to_i, body, response)
+      end
+
+      def error_code(body)
+        body['oauth_problem']
+      end
+
+      def error_description(body)
+        body['oauth_problem_advice']
+      end
+
+      def error_class_for(code, status)
+        case code
+        when 'consumer_key_unknown', 'consumer_key_rejected',
+             'signature_invalid', 'signature_method_rejected'
+          ConfigurationError
+        when 'consumer_key_refused'
+          Unavailable
+        else
+          super
+        end
       end
     end
   end

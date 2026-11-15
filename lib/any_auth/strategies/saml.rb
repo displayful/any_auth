@@ -30,7 +30,8 @@ module AnyAuth
           matches_request_id: session['request_id'],
           allowed_clock_drift: 5.seconds,
         )
-        raise Unauthorized, 'Invalid SAML response' unless response.is_valid?
+        raise error_from(nil, response) unless response.success?
+        raise InvalidCallback, 'Invalid SAML response' unless response.is_valid?
 
         Auth.new(
           provider:,
@@ -71,6 +72,23 @@ module AnyAuth
       def require_present(settings)
         missing = settings.select { |_name, value| value.blank? }.keys
         raise ArgumentError, "#{provider} needs #{missing.to_sentence}" if missing.any?
+      end
+
+      def error_code(response)
+        response.status_code
+      end
+
+      def error_description(response)
+        response.status_message
+      end
+
+      def error_class_for(code, _status)
+        case code
+        when nil then InvalidCallback
+        when /RequestDenied|AuthnFailed|NoPassive|UnknownPrincipal/ then AccessDenied
+        when /Responder/ then Unavailable
+        else ConfigurationError
+        end
       end
 
       def info_from(response)

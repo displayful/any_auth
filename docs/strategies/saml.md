@@ -116,7 +116,7 @@ ruby-saml checks the signature against `idp_cert`, the issuer, the audience,
 the destination and recipient, and the timestamps (with five seconds of
 clock drift). Two of its checks are stricter than its defaults: the response
 must name your entity ID as its audience, and must name a person (a NameID).
-An invalid response is an `AnyAuth::Unauthorized`; a callback without one is
+An invalid response is an `AnyAuth::InvalidCallback`, a refusal from the IdP an `AnyAuth::AccessDenied`; a callback without one is
 an `AnyAuth::InvalidCallback`.
 
 ## The trade-off

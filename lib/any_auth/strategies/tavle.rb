@@ -17,7 +17,7 @@ module AnyAuth
 
       def identity(access_token, _session)
         userinfo = get(access_token, '/oauth/userinfo')
-        raise Unauthorized, "#{provider} returned no subject" if userinfo['sub'].blank?
+        raise AccessDenied, "#{provider} returned no subject" if userinfo['sub'].blank?
 
         { uid: userinfo['sub'].to_s, info: info_from(userinfo), raw: userinfo }
       end

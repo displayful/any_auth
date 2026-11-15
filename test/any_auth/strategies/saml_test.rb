@@ -19,7 +19,7 @@ module AnyAuth
       end
 
       test 'a signed response names the person by IdP and NameID, with the email it carries' do
-        auth = saml.callback_phase({ 'SAMLResponse' => signed_response }, {})
+        auth = post_back(signed_response)
 
         assert_equal 'saml', auth.provider
         assert_equal 'https://idp.acme.test:mette@acme.test', auth.uid
@@ -30,14 +30,14 @@ module AnyAuth
       end
 
       test 'a response signed by another key, or changed after signing, is refused' do
-        assert_raises(Unauthorized) do
-          saml.callback_phase({ 'SAMLResponse' => signed_response(key: OTHER_KEY) }, {})
+        assert_raises(InvalidCallback) do
+          post_back(signed_response(key: OTHER_KEY))
         end
 
         changed = Base64.decode64(signed_response).sub('Mette Holm', 'Someone Else')
 
-        assert_raises(Unauthorized) do
-          saml.callback_phase({ 'SAMLResponse' => Base64.strict_encode64(changed) }, {})
+        assert_raises(InvalidCallback) do
+          post_back(Base64.strict_encode64(changed))
         end
       end
 
@@ -46,8 +46,8 @@ module AnyAuth
         unsigned = response_xml(audience: SP_ENTITY_ID, not_on_or_after: expires,
           in_response_to: nil)
 
-        assert_raises(Unauthorized) do
-          saml.callback_phase({ 'SAMLResponse' => Base64.strict_encode64(unsigned) }, {})
+        assert_raises(InvalidCallback) do
+          post_back(Base64.strict_encode64(unsigned))
         end
       end
 
@@ -55,10 +55,10 @@ module AnyAuth
         nobody_in_particular = signed_response(audience: nil)
         nobody = signed_response(name_id: nil)
 
-        assert_raises(Unauthorized) do
-          saml.callback_phase({ 'SAMLResponse' => nobody_in_particular }, {})
+        assert_raises(InvalidCallback) do
+          post_back(nobody_in_particular)
         end
-        assert_raises(Unauthorized) { saml.callback_phase({ 'SAMLResponse' => nobody }, {}) }
+        assert_raises(InvalidCallback) { post_back(nobody) }
       end
 
       test 'a strategy missing a setting it checks against is an error, not a sign-in' do
@@ -77,14 +77,34 @@ module AnyAuth
         expired = signed_response(not_on_or_after: 1.minute.ago)
         elsewhere = signed_response(audience: 'https://elsewhere.test')
 
-        assert_raises(Unauthorized) { saml.callback_phase({ 'SAMLResponse' => expired }, {}) }
-        assert_raises(Unauthorized) { saml.callback_phase({ 'SAMLResponse' => elsewhere }, {}) }
+        assert_raises(InvalidCallback) { post_back(expired) }
+        assert_raises(InvalidCallback) { post_back(elsewhere) }
       end
 
       test 'when the sign-in was kept, a response to another request is refused' do
         answer = { 'SAMLResponse' => signed_response(in_response_to: '_another') }
 
-        assert_raises(Unauthorized) { saml.callback_phase(answer, { 'request_id' => '_ours' }) }
+        assert_raises(InvalidCallback) { saml.callback_phase(answer, { 'request_id' => '_ours' }) }
+      end
+
+      test 'a person the IdP could not authenticate is AccessDenied, with its status' do
+        failed = signed_response(status: %w[Responder AuthnFailed])
+
+        refused = assert_raises(AccessDenied) { post_back(failed) }
+
+        assert_includes refused.code, 'AuthnFailed'
+      end
+
+      test 'an IdP that cannot answer is Unavailable' do
+        down = signed_response(status: %w[Responder])
+
+        assert_raises(Unavailable) { post_back(down) }
+      end
+
+      test 'an IdP saying our request is wrong is a ConfigurationError' do
+        rejected = signed_response(status: %w[Requester])
+
+        assert_raises(ConfigurationError) { post_back(rejected) }
       end
 
       test 'a callback with no response is not a sign-in' do
@@ -113,6 +133,10 @@ module AnyAuth
         certificate.sign(KEY, OpenSSL::Digest.new('SHA256'))
       end
 
+      def post_back(response)
+        saml.callback_phase({ 'SAMLResponse' => response }, {})
+      end
+
       def saml
         Saml.new(
           idp_sso_service_url: IDP_SSO_URL,
@@ -124,9 +148,10 @@ module AnyAuth
       end
 
       def signed_response(key: KEY, audience: SP_ENTITY_ID, name_id: 'mette@acme.test',
-                          not_on_or_after: 5.minutes.from_now, in_response_to: nil)
+                          not_on_or_after: 5.minutes.from_now, in_response_to: nil,
+                          status: %w[Success])
         xml = response_xml(audience:, name_id:, not_on_or_after: not_on_or_after.utc.iso8601,
-          in_response_to:)
+          in_response_to:, status:)
         document = XMLSecurity::Document.new(xml)
         document.sign_document(key, CERTIFICATE, XMLSecurity::Document::RSA_SHA256,
           XMLSecurity::Document::SHA256)
@@ -134,7 +159,16 @@ module AnyAuth
         Base64.strict_encode64(document.to_s)
       end
 
-      def response_xml(audience:, not_on_or_after:, in_response_to:, name_id: 'mette@acme.test')
+      def status_code(names)
+        names.reverse.reduce('') do |nested, name|
+          value = "urn:oasis:names:tc:SAML:2.0:status:#{name}"
+
+          %(<samlp:StatusCode Value="#{value}">#{nested}</samlp:StatusCode>)
+        end
+      end
+
+      def response_xml(audience:, not_on_or_after:, in_response_to:, name_id: 'mette@acme.test',
+                       status: %w[Success])
         now = Time.now.utc.iso8601
         replying = %( InResponseTo="#{in_response_to}") if in_response_to
         naming = %(<saml:NameID Format="#{EMAIL_FORMAT}">#{name_id}</saml:NameID>) if name_id
@@ -148,9 +182,7 @@ module AnyAuth
           <samlp:Response xmlns:samlp="#{protocol}" xmlns:saml="#{assertion}" ID="_r1" Version="2.0"
             IssueInstant="#{now}" Destination="#{CALLBACK_URL}"#{replying}>
             <saml:Issuer>#{IDP_ENTITY_ID}</saml:Issuer>
-            <samlp:Status>
-              <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
-            </samlp:Status>
+            <samlp:Status>#{status_code(status)}</samlp:Status>
             <saml:Assertion ID="_a1" Version="2.0" IssueInstant="#{now}">
               <saml:Issuer>#{IDP_ENTITY_ID}</saml:Issuer>
               <saml:Subject>

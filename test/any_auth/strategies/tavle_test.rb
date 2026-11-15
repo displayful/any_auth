@@ -35,10 +35,10 @@ module AnyAuth
         assert_requested :get, USERINFO_URL, headers: { 'Authorization' => 'Bearer new' }
       end
 
-      test 'a token Tavle names nobody for is Unauthorized' do
+      test 'a token Tavle names nobody for is AccessDenied' do
         stub_json(:get, USERINFO_URL, error: 'invalid_token')
 
-        assert_raises(Unauthorized) { tavle.callback_phase(callback_params, stored_session) }
+        assert_raises(AccessDenied) { tavle.callback_phase(callback_params, stored_session) }
       end
 
       private

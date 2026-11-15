@@ -68,14 +68,14 @@ module AnyAuth
         assert_raises(InvalidCallback) { vendor.callback_phase(without_verifier, KEPT) }
       end
 
-      test 'a person who declined is Declined' do
-        assert_raises(Declined) { vendor.callback_phase({ 'denied' => 'request' }, KEPT) }
+      test 'a person who declined is AccessDenied' do
+        assert_raises(AccessDenied) { vendor.callback_phase({ 'denied' => 'request' }, KEPT) }
       end
 
-      test 'a swap the vendor refuses is Unauthorized, and a vendor that is down is Unavailable' do
+      test 'a swap the vendor refuses is AccessDenied, and a vendor that is down is Unavailable' do
         stub_request(:post, ACCESS_TOKEN_URL).to_return(status: 401)
 
-        assert_raises(Unauthorized) { vendor.callback_phase(answer, KEPT) }
+        assert_raises(AccessDenied) { vendor.callback_phase(answer, KEPT) }
 
         stub_request(:post, ACCESS_TOKEN_URL).to_return(status: 503)
 
@@ -84,6 +84,27 @@ module AnyAuth
         stub_request(:post, ACCESS_TOKEN_URL).to_timeout
 
         assert_raises(Unavailable) { vendor.callback_phase(answer, KEPT) }
+      end
+
+      test "a refusal carries OAuth 1's problem and advice" do
+        stub_request(:post, ACCESS_TOKEN_URL).to_return(
+          status: 401,
+          body: 'oauth_problem=token_expired&oauth_problem_advice=Sign+in+again'
+        )
+
+        refused = assert_raises(AccessDenied) { vendor.callback_phase(answer, KEPT) }
+
+        assert_equal 'token_expired', refused.code
+        assert_equal 'Sign in again', refused.description
+      end
+
+      test 'a vendor that does not know our key is a ConfigurationError' do
+        stub_request(:post, ACCESS_TOKEN_URL).to_return(
+          status: 401,
+          body: 'oauth_problem=consumer_key_unknown'
+        )
+
+        assert_raises(ConfigurationError) { vendor.callback_phase(answer, KEPT) }
       end
 
       test 'credentials do not expire, so they are never refreshed' do

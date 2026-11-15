@@ -66,7 +66,7 @@ class Auth::BaseController < ApplicationController
 
   allow_unauthenticated_access
   before_action :set_strategy
-  rescue_from AnyAuth::Error, with: :refused
+  rescue_from AnyAuth::AuthenticationError, with: :refused
 
   private
     def set_strategy
@@ -105,8 +105,10 @@ end
 `redirect_to_provider` keeps what the callback needs in the session and sends
 the person to the vendor. `authenticate_with_provider` checks the callback,
 swaps the code for tokens, asks who signed in and returns an `auth`. A failed
-or refused sign-in raises an `AnyAuth::Error`, and the person lands back on
-the sign-in page.
+or refused sign-in raises an `AnyAuth::AuthenticationError`, and the person
+lands back on the sign-in page. A setup mistake the vendor reports, such as a
+wrong client secret, is an `AnyAuth::ConfigurationError`: not caught here, so
+it becomes an error page and reaches your error tracker.
 
 `after_authentication_url` already returns people to the page they were
 asked to sign in on: the generator keeps it in the session, and the trip to
@@ -359,16 +361,55 @@ What `uid` is, and what each vendor puts in `raw`, is on its
 
 ### Errors
 
-| Error | Means |
-| --- | --- |
-| `InvalidCallback` | the callback is not ours: wrong state, no code, a bad signature, nothing under way |
-| `Declined` | the person or the vendor said no (`error=` on the callback); `code` holds it |
-| `Unauthorized` | the vendor refused the code, the refresh or the ID token; `code` holds its reason, such as `invalid_grant` |
-| `Unavailable` | a timeout, a server error, an answer that cannot be read |
-| `RateLimited` | an `Unavailable` asking you to slow down |
+```
+AnyAuth::Error
+├── AnyAuth::AuthenticationError   the sign-in or refresh didn't work: rescue this
+│   ├── InvalidCallback            the answer can't be proven ours
+│   ├── AccessDenied               the person or the vendor said no, or the grant is dead
+│   └── Unavailable                the vendor couldn't answer now
+└── AnyAuth::ConfigurationError    the vendor says your setup is wrong: let it raise
+```
 
-All are `AnyAuth::Error`. Mistakes in setup are ordinary Ruby errors: an
-unconfigured provider is a `KeyError`.
+| Error | Means | Next |
+| --- | --- | --- |
+| `InvalidCallback` | wrong state, a bad signature or ID token, no code, nothing under way | start again |
+| `AccessDenied` | `access_denied`, `invalid_grant`, `unauthorized_client`, `invalid_scope`, a refused refresh | sign in again |
+| `Unavailable` | a timeout, a server error, a rate limit, an answer that cannot be read | try again later |
+| `ConfigurationError` | `invalid_client`, `invalid_request`, an unsupported grant or response type | fix the setup |
+
+Every error carries what the vendor said: `code` (its own word, such as
+`invalid_grant`, or nil), `description` (its explanation, for logs; never show
+it to people, it can be forged) and `retry_after` (seconds, when the vendor
+says when to try again).
+
+```ruby
+rescue_from AnyAuth::AuthenticationError, with: :refused
+rescue_from AnyAuth::Unavailable, with: :try_again_later
+
+# a background refresh
+retry_on AnyAuth::Unavailable, wait: ->(executions, error) { error.retry_after || executions**4 }
+```
+
+Mistakes AnyAuth can see before asking anyone are ordinary Ruby errors: an
+unconfigured provider is a `KeyError`, a missing `client_id` an `ArgumentError`.
+
+### A failure page, as with OmniAuth
+
+To send every failed sign-in to one page, as OmniAuth's `/auth/failure` does,
+use the helper:
+
+```ruby
+rescue_from AnyAuth::AuthenticationError, with: :redirect_to_any_auth_failure
+
+# config/routes.rb
+get "auth/failure", to: "auth/failures#show", as: :auth_failure
+```
+
+It reports the error to `Rails.error` and redirects to
+`auth_failure_path(message:, provider:)`: `message` is the vendor's `code`, or
+the kind of failure (`access_denied`, `invalid_callback`, `unavailable`).
+Unlike OmniAuth's, it never sends a `ConfigurationError` there, and it behaves
+the same in every environment.
 
 ### Strategies
 
@@ -419,7 +460,7 @@ checked along the way.
 | `/auth/:provider` and its callback, by the middleware | two routes and actions of your own |
 | `request.env["omniauth.auth"]` | the return value of `authenticate_with_provider` |
 | `omniauth.params`, `omniauth.origin` | `params:`, read back as `auth.params` |
-| `/auth/failure` | `rescue_from AnyAuth::Error` |
+| `/auth/failure` | `rescue_from AnyAuth::AuthenticationError`, or [the failure page helper](#a-failure-page-as-with-omniauth) |
 | a `setup` proc | [the arguments you build the strategy with](#configuring-each-sign-in-omniauths-setup-phase) |
 | `extra.raw_info` | `auth.raw` |
 

@@ -13,9 +13,17 @@ module AnyAuth
 
       private
 
+      def error_code(body)
+        super || body['status']
+      end
+
+      def error_description(body)
+        super || body['message']
+      end
+
       def identity(access_token, _session)
         token_info = get(access_token, "/oauth/v1/access-tokens/#{access_token.token}")
-        raise Unauthorized, "#{provider} returned no user" if token_info['user_id'].blank?
+        raise AccessDenied, "#{provider} returned no user" if token_info['user_id'].blank?
 
         {
           uid: token_info['user_id'].to_s,

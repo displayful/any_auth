@@ -33,7 +33,7 @@ colleagues signing in to the same portal have different `uid`s.
 
 The strategy asks HubSpot once, with the new token, whose it is
 (`GET /oauth/v1/access-tokens/<access_token>`). A token HubSpot names no
-user for is an `AnyAuth::Unauthorized`.
+user for is an `AnyAuth::AccessDenied`.
 
 Three things follow from that request:
 

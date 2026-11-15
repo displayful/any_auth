@@ -47,7 +47,7 @@ mailbox. Link an existing account by email only when this is true.
 The ID token is read from the token endpoint and checked for audience (your
 client id), expiry, the nonce sent with this request, and issuer
 (`accounts.google.com`). A token issued for several clients must say it is
-for yours (`azp`). A token that fails is an `AnyAuth::Unauthorized`.
+for yours (`azp`). A token that fails is an `AnyAuth::InvalidCallback`.
 
 ## Calling the API
 

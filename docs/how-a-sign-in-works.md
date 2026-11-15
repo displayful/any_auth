@@ -64,22 +64,22 @@ In this order; the first that fails raises.
 | --- | --- |
 | a sign-in is under way (`redirect_uri` kept) | `InvalidCallback` |
 | `state` matches, compared in constant time | `InvalidCallback` |
-| no `error=` | `Declined`, with the vendor's code |
+| no `error=` | by the vendor's code (see below) |
 | a `code` is present | `InvalidCallback` |
-| the vendor swaps the code (sent with `redirect_uri` and the PKCE verifier) | `Unauthorized`, `RateLimited` or `Unavailable` |
-| the answer holds an access token | `Unauthorized` |
+| the vendor swaps the code (sent with `redirect_uri` and the PKCE verifier) | by the vendor's code and status (see below) |
+| the answer holds an access token | `AccessDenied` |
 
 Then the strategy's own checks: Shopify's HMAC and shop before the swap, and
 for OpenID Connect, on the ID token:
 
 | Check | Raises |
 | --- | --- |
-| it can be read, and is a JSON object | `Unauthorized` |
-| issued by the vendor (`valid_issuer?`) | `Unauthorized` |
-| for this client: `aud` names it, and `azp` does when there are several audiences | `Unauthorized` |
-| not expired | `Unauthorized` |
-| `nonce` matches, in constant time | `Unauthorized` |
-| `sub` (or the vendor's `uid` claim) is present | `Unauthorized` |
+| it can be read, and is a JSON object | `InvalidCallback` |
+| issued by the vendor (`valid_issuer?`) | `InvalidCallback` |
+| for this client: `aud` names it, and `azp` does when there are several audiences | `InvalidCallback` |
+| not expired | `InvalidCallback` |
+| `nonce` matches, in constant time | `InvalidCallback` |
+| `sub` (or the vendor's `uid` claim) is present | `InvalidCallback` |
 
 The ID token's signature is not verified. It is read straight from the token
 endpoint over TLS, in answer to a request authenticated with the client
@@ -91,19 +91,26 @@ allows. A token from anywhere else must be verified.
 `OAuth1` asks the vendor for a request token while leaving, keeps the token
 and its secret (`request_token`, `request_token_secret`) instead of a state,
 and on the way back checks, in order: a sign-in is under way; `denied` naming
-our token is `Declined`; `oauth_token` is our token, in constant time; an
+our token is `AccessDenied`; `oauth_token` is our token, in constant time; an
 `oauth_verifier` is present. Then it swaps the verifier for an access token.
 
 ## Errors from the vendor
 
 Every request to the vendor goes through one place, which maps what went wrong:
 
-| What happened | Raises | `code` |
-| --- | --- | --- |
-| 400, 401 or 403, or an answer with no token | `Unauthorized` | the vendor's `error`, such as `invalid_grant` |
-| 429 | `RateLimited` | the vendor's `error`, if any |
-| any other error status | `Unavailable` | the vendor's `error`, if any |
-| a timeout, no connection, unreadable JSON | `Unavailable` | nil |
+| What happened | Raises |
+| --- | --- |
+| `invalid_client`, `invalid_request`, `unsupported_grant_type`, `unsupported_response_type` | `ConfigurationError` |
+| `server_error`, `temporarily_unavailable` | `Unavailable` |
+| any other code, or none, with 400, 401 or 403 (`access_denied`, `invalid_grant`, `unauthorized_client`, `invalid_scope`) | `AccessDenied` |
+| 429, 5xx, any other status | `Unavailable`, with `retry_after` from `Retry-After` |
+| a timeout, no connection, unreadable JSON | `Unavailable` |
+
+`code` and `description` are the vendor's own, or nil. The library adds no
+codes of its own: the class says what kind of failure it was. OAuth 1 reads
+`oauth_problem` and `oauth_problem_advice`; SAML reads its status
+(`AuthnFailed`, `RequestDenied` and `NoPassive` are `AccessDenied`,
+`Responder` is `Unavailable`, others are `ConfigurationError`).
 
 Messages name the provider and the vendor's code, never a token or the
 vendor's body, and the original exception is dropped (`cause: nil`), because
