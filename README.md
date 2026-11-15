@@ -112,6 +112,16 @@ the sign-in page.
 asked to sign in on: the generator keeps it in the session, and the trip to
 the vendor leaves it there.
 
+`auth_callback_url` is built from the request's `Host` header, which anyone
+can forge. Vendors that match redirect URIs exactly refuse a forged one, but
+not all are strict, so tell Rails which hosts are yours; it then refuses any
+other before your controller runs:
+
+```ruby
+# config/environments/production.rb
+config.hosts = %w[ example.com ]
+```
+
 ### 5. Find the person
 
 ```ruby
@@ -162,7 +172,9 @@ auth = authenticate_with_provider(@strategy)
 auth.params["invitation"]
 ```
 
-It goes through the session as JSON, so its keys come back as strings.
+It goes through the session as JSON, so its keys come back as strings. Keep
+it small: Rails' cookie session holds 4 KB, and a large `params:` raises
+`ActionDispatch::Cookies::CookieOverflow` when the person leaves.
 
 ## Connect to a vendor's API
 

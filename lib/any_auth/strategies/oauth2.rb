@@ -16,6 +16,8 @@ module AnyAuth
       authorize_option :scope
 
       def request_phase(redirect_uri:, **params)
+        raise ArgumentError, "#{provider} needs a client_id" if client_id.blank?
+
         state = SecureRandom.hex(24)
         session = { 'state' => state, 'redirect_uri' => redirect_uri }
 

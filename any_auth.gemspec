@@ -23,6 +23,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'oauth2', '~> 2.0'
 
   spec.add_development_dependency 'actionpack'
+  spec.add_development_dependency 'cgi'
   spec.add_development_dependency 'minitest'
   spec.add_development_dependency 'oauth', '>= 1.1'
   spec.add_development_dependency 'rack'

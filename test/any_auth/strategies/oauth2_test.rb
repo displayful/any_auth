@@ -107,6 +107,14 @@ module AnyAuth
         assert_requested :post, TOKEN_URL, headers: { 'Authorization' => /\ABasic / }
       end
 
+      test 'a strategy with no client id is an error, not a trip to the vendor' do
+        error = assert_raises(ArgumentError) do
+          Hubspot.new.request_phase(redirect_uri: CALLBACK_URL)
+        end
+
+        assert_includes error.message, 'client_id'
+      end
+
       test 'no challenge is sent unless PKCE is switched on' do
         request = hubspot.request_phase(redirect_uri: CALLBACK_URL)
 
@@ -124,6 +132,7 @@ module AnyAuth
         hubspot.callback_phase(callback_params(state: sent['state']), request.session)
 
         assert_equal 'S256', sent['code_challenge_method']
+        assert_equal 43, verifier.length
         assert_equal challenge_for(verifier), sent['code_challenge']
         assert_requested :post, TOKEN_URL, body: hash_including('code_verifier' => verifier)
       end

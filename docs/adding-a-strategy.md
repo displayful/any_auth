@@ -103,7 +103,9 @@ claim that must be there.
 ## An OAuth 1 vendor
 
 `OAuth1` is loaded on request and needs the [oauth](https://gitlab.com/ruby-oauth/oauth)
-gem in your bundle; without it, requiring it raises `LoadError`.
+gem in your bundle, and on Ruby 4.0 the `cgi` gem too (the oauth gem still
+calls `CGI.parse`, which left Ruby itself in 4.0). Without them, requiring it
+raises `LoadError` saying which is missing.
 
 ```ruby
 require "any_auth/strategies/oauth1"
