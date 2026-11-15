@@ -44,8 +44,9 @@ module AnyAuth
     end
 
     setup do
-      stub_json(:post, 'https://api.hubapi.com/oauth/v1/token', access_token: 'new')
-      stub_json(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/new', user_id: 41)
+      stub_json(:post, 'https://api.hubspot.com/oauth/2026-09/token', access_token: 'new')
+      stub_json(:post, 'https://api.hubspot.com/oauth/2026-09/token/introspect',
+        active: true, user_id: 41)
     end
 
     test 'leaving and coming home is one call each, and brings back what the app asked to keep' do
@@ -100,7 +101,7 @@ module AnyAuth
       get '/hubspot/remembered'
 
       assert_equal({ 'membership_id' => 7 }, response.parsed_body)
-      assert_not_requested :post, 'https://api.hubapi.com/oauth/v1/token'
+      assert_not_requested :post, 'https://api.hubspot.com/oauth/2026-09/token'
 
       get '/hubspot/home', params: { code: 'code', state: }
 

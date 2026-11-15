@@ -5,10 +5,11 @@ require 'test_helper'
 module AnyAuth
   module Strategies
     class OAuth2Test < ActiveSupport::TestCase
-      TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token'
+      TOKEN_URL = 'https://api.hubspot.com/oauth/2026-09/token'
 
       setup do
-        stub_json(:get, 'https://api.hubapi.com/oauth/v1/access-tokens/new', user_id: 41)
+        stub_json(:post, 'https://api.hubspot.com/oauth/2026-09/token/introspect',
+          active: true, user_id: 41)
       end
 
       test 'a code is swapped for credentials at the address it was sent back to' do

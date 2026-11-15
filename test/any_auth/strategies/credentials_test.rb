@@ -5,7 +5,7 @@ require 'test_helper'
 module AnyAuth
   module Strategies
     class CredentialsTest < ActiveSupport::TestCase
-      TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token'
+      TOKEN_URL = 'https://api.hubspot.com/oauth/2026-09/token'
 
       test 'credentials still good, or that never expire, are answered as they are' do
         good = { 'access_token' => 'access', 'expires_at' => 1.hour.from_now.utc.iso8601 }

@@ -211,17 +211,17 @@ A vendor with its own error shape overrides up to three private methods:
 | `error_description(body)` | `body['error_description']` | the same, for its explanation |
 | `error_class_for(code, status)` | the OAuth codes, then the status | one of its own codes means a setup mistake or an outage |
 
-HubSpot's token endpoint answers `{"status": "BAD_REFRESH_TOKEN", "message": "…"}`
-with a 400, so its strategy says only where those are; the 400 makes it an
-`AccessDenied`:
+An OAuth 1 vendor answers `oauth_problem=token_rejected&oauth_problem_advice=…`
+instead of `error`, so `OAuth1` says only where those are; a 401 with it is
+then an `AccessDenied`:
 
 ```ruby
 def error_code(body)
-  super || body['status']
+  body['oauth_problem']
 end
 
 def error_description(body)
-  super || body['message']
+  body['oauth_problem_advice']
 end
 ```
 

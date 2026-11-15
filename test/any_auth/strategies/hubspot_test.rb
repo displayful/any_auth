@@ -5,15 +5,16 @@ require 'test_helper'
 module AnyAuth
   module Strategies
     class HubspotTest < ActiveSupport::TestCase
-      TOKEN_INFO_URL = 'https://api.hubapi.com/oauth/v1/access-tokens/new'
+      TOKEN_URL = 'https://api.hubspot.com/oauth/2026-09/token'
+      INTROSPECT_URL = 'https://api.hubspot.com/oauth/2026-09/token/introspect'
 
       setup do
-        stub_json(:post, 'https://api.hubapi.com/oauth/v1/token', access_token: 'new')
+        stub_json(:post, TOKEN_URL, access_token: 'new')
       end
 
       test 'HubSpot names the user who signed in, and says which portal they opened' do
-        stub_json(:get, TOKEN_INFO_URL, user_id: 41, user: 'mette@acme.test', hub_id: 8823,
-          token: 'new')
+        stub_json(:post, INTROSPECT_URL, active: true, user_id: 41, user: 'mette@acme.test',
+          hub_id: 8823, token: 'new')
 
         auth = come_home
 
@@ -24,43 +25,29 @@ module AnyAuth
         assert_nil auth.raw['token']
       end
 
-      test "a refresh HubSpot refuses carries HubSpot's own code and message" do
-        refusal = { status: 'BAD_REFRESH_TOKEN', message: 'missing or invalid refresh token' }
-        stub_request(:post, 'https://api.hubapi.com/oauth/v1/token').to_return(
-          status: 400,
-          headers: { 'Content-Type' => 'application/json' },
-          body: refusal.to_json
-        )
-        hubspot = Hubspot.new(client_id: 'app', client_secret: 'secret')
+      test 'the token is asked about in the body, never in the address' do
+        asked = stub_json(:post, INTROSPECT_URL, active: true, user_id: 41)
+          .with(body: { client_id: 'app', client_secret: 'secret',
+                        token_type_hint: 'access_token', token: 'new' })
 
-        refused = assert_raises(AccessDenied) { hubspot.refresh!('refresh_token' => 'old') }
+        come_home
 
-        assert_equal 'BAD_REFRESH_TOKEN', refused.code
-        assert_equal 'missing or invalid refresh token', refused.description
+        assert_requested asked
       end
 
-      test 'a token HubSpot names no user for is AccessDenied' do
-        stub_json(:get, TOKEN_INFO_URL, message: 'unknown token')
+      test 'a token HubSpot no longer counts as active is AccessDenied' do
+        stub_json(:post, INTROSPECT_URL, active: false, user_id: 41)
 
         assert_raises(AccessDenied) { come_home }
       end
 
       test 'an answer that cannot be read is Unavailable' do
-        stub_request(:get, TOKEN_INFO_URL).to_return(
+        stub_request(:post, INTROSPECT_URL).to_return(
           headers: { 'Content-Type' => 'text/html' },
           body: '<html>'
         )
 
         assert_raises(Unavailable) { come_home }
-      end
-
-      test 'a refusal never repeats the token that was in the address' do
-        stub_request(:get, TOKEN_INFO_URL).to_return(status: 401)
-
-        refused = assert_raises(AccessDenied) { come_home }
-
-        assert_nil refused.cause
-        assert_not_includes refused.message, 'new'
       end
 
       private

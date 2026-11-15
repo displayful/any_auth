@@ -5,31 +5,33 @@ module AnyAuth
     class Hubspot < OAuth2
       def client_options
         {
-          site: 'https://api.hubapi.com',
+          site: 'https://api.hubspot.com',
           authorize_url: 'https://app.hubspot.com/oauth/authorize',
-          token_url: 'https://api.hubapi.com/oauth/v1/token',
+          token_url: '/oauth/2026-09/token',
         }
       end
 
       private
 
-      def error_code(body)
-        super || body['status']
-      end
-
-      def error_description(body)
-        super || body['message']
-      end
-
       def identity(access_token, _session)
-        token_info = get(access_token, "/oauth/v1/access-tokens/#{access_token.token}")
-        raise AccessDenied, "#{provider} returned no user" if token_info['user_id'].blank?
+        token_info = introspect(access_token.token)
+        raise AccessDenied, "#{provider} returned no user" unless named_user?(token_info)
 
         {
           uid: token_info['user_id'].to_s,
           info: Info.new(email: token_info['user']),
           raw: token_info.except('token'),
         }
+      end
+
+      def introspect(token)
+        body = { client_id:, client_secret:, token_type_hint: 'access_token', token: }
+
+        parsed { client.request(:post, '/oauth/2026-09/token/introspect', body:, snaky: false) }
+      end
+
+      def named_user?(token_info)
+        token_info['active'] == true && token_info['user_id'].present?
       end
     end
   end
