@@ -422,6 +422,7 @@ the same in every environment.
 | [`Relatel`](docs/strategies/relatel.md) | OAuth 2 | one more request, to name the employee |
 | [`Tavle`](docs/strategies/tavle.md) | OAuth 2 | one more request, to name the member |
 | [`Shopify`](docs/strategies/shopify.md) | OAuth 2 with a field | per-shop endpoints, signed callback |
+| [`Signicat`](docs/strategies/signicat.md) | OpenID Connect | national eIDs, with the eID and level checked |
 | [`Economic`](docs/strategies/economic.md), [`Adversus`](docs/strategies/adversus.md) | fields only | |
 | [`Saml`](docs/strategies/saml.md) | SAML 2.0 | a customer's IdP; needs ruby-saml, loaded on request |
 | [`OAuth1`](docs/adding-a-strategy.md#an-oauth-1-vendor) | OAuth 1.0a | a base for OAuth 1 vendors; needs the oauth gem, loaded on request |

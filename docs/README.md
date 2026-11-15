@@ -24,6 +24,7 @@ back, and what is unusual about it.
 | [Relatel](strategies/relatel.md) | OAuth 2 | the Relatel API |
 | [Tavle](strategies/tavle.md) | OAuth 2 | signing in with Tavle, and the boards API |
 | [Shopify](strategies/shopify.md) | OAuth 2 with a field | a shop's Admin API |
+| [Signicat](strategies/signicat.md) | OpenID Connect | signing in with a national eID |
 | [e-conomic](strategies/economic.md) | fields only | the e-conomic API |
 | [Adversus](strategies/adversus.md) | fields only | the Adversus API |
 | [SAML](strategies/saml.md) | SAML 2.0, with ruby-saml | signing in through a customer's IdP |
