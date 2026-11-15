@@ -32,6 +32,11 @@ module AnyAuth
         render json: any_auth_params(strategy)
       end
 
+      def forget
+        delete_any_auth_cookie
+        head :ok
+      end
+
       private
 
       def strategy
@@ -75,6 +80,15 @@ module AnyAuth
       assert_empty response.parsed_body
 
       get '/hubspot/home', params: { code: 'code', state: 'x' }
+
+      assert_response :unprocessable_content
+    end
+
+    test 'a sign-in the app forgot, as on signing out, cannot be finished' do
+      post '/hubspot/leave'
+      state = state_sent
+      delete '/hubspot/forget'
+      get '/hubspot/home', params: { code: 'code', state: }
 
       assert_response :unprocessable_content
     end

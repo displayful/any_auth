@@ -22,7 +22,7 @@ module AnyAuth
 
     def authenticate_with_provider(strategy)
       stored = any_auth_cookie(strategy)
-      cookies.delete(any_auth_cookie_name, **any_auth_cookie_options)
+      delete_any_auth_cookie
 
       attributes = stored.fetch('attributes', {})
       strategy.assign_attributes(attributes.slice(*strategy.class.attribute_names))
@@ -32,6 +32,10 @@ module AnyAuth
 
     def any_auth_params(strategy)
       any_auth_cookie(strategy).fetch('params', {})
+    end
+
+    def delete_any_auth_cookie
+      cookies.delete(any_auth_cookie_name, **any_auth_cookie_options)
     end
 
     def callback_params

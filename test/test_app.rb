@@ -26,5 +26,6 @@ TestApp.routes.draw do
     get 'home', action: :show
     post 'home', action: :show
     get 'remembered', action: :remembered
+    delete 'forget', action: :forget
   end
 end

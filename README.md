@@ -341,9 +341,12 @@ when the strategy is built.
 | `redirect_to_provider(strategy, redirect_uri:, params: {})` | keeps the sign-in in its own cookie and redirects to the vendor |
 | `authenticate_with_provider(strategy)` | checks the callback, swaps the code and returns the `auth` |
 | `any_auth_params(strategy)` | the `params:` you passed, readable before the code is swapped and when the sign-in fails |
+| `delete_any_auth_cookie` | forgets a sign-in under way; call it when someone signs out |
 
 The sign-in is kept for ten minutes and used once. One at a time: a second
-replaces the first.
+replaces the first. It lives in its own cookie rather than the session, so
+`reset_session` leaves it; call `delete_any_auth_cookie` on sign-out so the
+next person at the browser cannot finish it.
 
 ### What comes back
 
