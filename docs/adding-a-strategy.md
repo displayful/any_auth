@@ -176,12 +176,13 @@ OAuth 2 strategy.
 
 | | Default | Change it |
 | --- | --- | --- |
-| PKCE (S256) | off for `OAuth2`, on for `OpenIDConnect` | `self.pkce = true` or `false` in the class; `pkce: true` per provider |
+| PKCE (S256) | on | `self.pkce = false` in the class for a vendor that refuses it, as Apple; `pkce: false` per provider |
 | how the client authenticates | id and secret in the request body | `auth_scheme: :basic_auth` in `client_options` |
 | the default scope | none for `OAuth2`, `email profile` for `OpenIDConnect` | a `scope:` default in an overridden `request_phase`, as Apple does |
 
-Turn PKCE on when the vendor's metadata lists `S256` under
-`code_challenge_methods_supported`, as Relatel's does.
+PKCE is on because RFC 9700 recommends it for every client; a vendor that does
+not support it ignores the parameters. Turn it off only for a vendor that
+refuses them.
 
 ## Steps you can override
 

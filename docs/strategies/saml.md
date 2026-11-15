@@ -51,7 +51,7 @@ AnyAuth.strategy(:saml,
 | `sp_entity_id` | your entity ID; the response's audience must match |
 | `assertion_consumer_service_url` | your callback; the response must be addressed to it |
 | `allow_idp_initiated` | accept sign-ins started at the IdP; off by default (see below) |
-| `cache` | where used assertion IDs are kept; defaults to `Rails.cache` |
+| `cache` | where used assertion IDs are kept; defaults to `Rails.cache`, and may not be a `NullStore` |
 | `name_identifier_format` | the NameID format to ask for, such as `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` |
 
 The first five are required: a strategy missing any of them raises
@@ -125,10 +125,13 @@ must name your entity ID as its audience, and must name a person (a NameID).
 It then refuses, as an `AnyAuth::InvalidCallback`:
 
 - a response to a request this browser did not make, or to none at all;
+- an assertion with no expiry (`NotOnOrAfter`), which could be replayed for
+  ever;
 - a response it has already accepted once: each assertion ID is recorded
-  until the assertion expires, in `Rails.cache` or the `cache:` you pass. The
-  cache must be shared by every process, as Solid Cache or Redis is; a memory
-  store in each process lets a replay through on another one.
+  until a minute after the assertion expires, in `Rails.cache` or the
+  `cache:` you pass. The cache must be shared by every process, as Solid Cache
+  or Redis is; a memory store in each process lets a replay through on another
+  one, and a `NullStore` is refused.
 
 A failure from the IdP is an `AnyAuth::AccessDenied`. IdPs often leave
 failures unsigned, so `code` keeps only the SAML status (such as

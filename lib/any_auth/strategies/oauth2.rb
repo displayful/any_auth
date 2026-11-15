@@ -4,7 +4,7 @@ module AnyAuth
   module Strategies
     class OAuth2 < Base
       class_attribute :authorize_options, default: [], instance_writer: false
-      class_attribute :pkce, default: false
+      class_attribute :pkce, default: true
 
       attr_accessor :client_id, :client_secret
 

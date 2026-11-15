@@ -94,6 +94,31 @@ module AnyAuth
         assert_equal 'saml', idp_initiated.callback_phase(unasked, {}).provider
       end
 
+      test 'a switch for IdP-initiated sign-ins read as text is still off when it says so' do
+        unasked = { 'SAMLResponse' => signed_response(in_response_to: nil) }
+        off = saml
+        off.allow_idp_initiated = 'false'
+
+        assert_raises(InvalidCallback) { off.callback_phase(unasked, {}) }
+      end
+
+      test 'an assertion that never expires is refused' do
+        xml = response_xml(audience: SP_ENTITY_ID, not_on_or_after: 5.minutes.from_now.iso8601,
+          in_response_to: '_ours')
+        never = xml.sub(/(<saml:Conditions NotBefore="[^"]+") NotOnOrAfter="[^"]+"/, '\\1')
+
+        assert_raises(InvalidCallback) { post_back(sign(never)) }
+      end
+
+      test 'without a cache that keeps what it is given, replays cannot be refused' do
+        uncached = saml
+        uncached.cache = ActiveSupport::Cache::NullStore.new
+
+        answer = { 'SAMLResponse' => signed_response }
+
+        assert_raises(ArgumentError) { uncached.callback_phase(answer, KEPT) }
+      end
+
       test 'a response used once is refused the second time' do
         once = saml
         response = signed_response
@@ -171,6 +196,11 @@ module AnyAuth
                           status: %w[Success])
         xml = response_xml(audience:, name_id:, not_on_or_after: not_on_or_after.utc.iso8601,
           in_response_to:, status:)
+
+        sign(xml, key:)
+      end
+
+      def sign(xml, key: KEY)
         document = XMLSecurity::Document.new(xml)
         document.sign_document(key, CERTIFICATE, XMLSecurity::Document::RSA_SHA256,
           XMLSecurity::Document::SHA256)

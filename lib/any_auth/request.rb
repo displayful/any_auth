@@ -9,5 +9,9 @@ module AnyAuth
     def pretty_print(printer)
       printer.text(inspect)
     end
+
+    def as_json(*)
+      to_h.except(:session).as_json
+    end
   end
 end

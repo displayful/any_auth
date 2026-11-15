@@ -3,8 +3,6 @@
 module AnyAuth
   module Strategies
     class OpenIDConnect < OAuth2
-      self.pkce = true
-
       def request_phase(redirect_uri:, scope: self.scope || 'email profile', **params)
         nonce = SecureRandom.hex(16)
         request = super(redirect_uri:, **params, scope: openid_scope(scope), nonce:)

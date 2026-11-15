@@ -6,6 +6,7 @@ module AnyAuth
 
     def redirect_to_provider(strategy, redirect_uri:, params: {})
       auth_request = strategy.request_phase(redirect_uri:)
+      warn_about_plain_http if Rails.env.production? && !request.ssl?
       stored = {
         'provider' => strategy.provider,
         'request' => auth_request.session,
@@ -48,6 +49,12 @@ module AnyAuth
       return {} unless Time.at(stored['expires_at'].to_i).future?
 
       stored
+    end
+
+    def warn_about_plain_http
+      Rails.logger.warn 'AnyAuth: a sign-in started over plain HTTP, so its cookie is not ' \
+                        'Secure and POST callbacks (Apple, SAML) cannot find it. Behind a TLS ' \
+                        'proxy, set config.assume_ssl = true.'
     end
 
     def any_auth_cookie_name

@@ -21,6 +21,7 @@ module AnyAuth
 
       assert_not_includes request.inspect, 'kept'
       assert_not_includes request.pretty_inspect, 'kept'
+      assert_not_includes request.to_json, 'kept'
     end
   end
 end

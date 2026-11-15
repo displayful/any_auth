@@ -3,8 +3,6 @@
 module AnyAuth
   module Strategies
     class Relatel < OAuth2
-      self.pkce = true
-
       def client_options
         {
           site: 'https://app.relatel.dk',

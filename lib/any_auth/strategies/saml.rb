@@ -13,8 +13,8 @@ module AnyAuth
       STATUS = /\Aurn:oasis:names:tc:SAML:2\.0:status:\w+\z/
 
       attr_accessor :idp_sso_service_url, :idp_cert, :idp_entity_id, :sp_entity_id,
-        :assertion_consumer_service_url, :name_identifier_format, :allow_idp_initiated
-      attr_writer :cache
+        :assertion_consumer_service_url, :name_identifier_format
+      attr_writer :allow_idp_initiated, :cache
 
       def request_phase(redirect_uri:)
         authn_request = OneLogin::RubySaml::Authrequest.new
@@ -37,6 +37,7 @@ module AnyAuth
         raise AccessDenied.new('SAML sign-in refused', code: status_code(response)) unless
           response.success?
         raise InvalidCallback, 'Invalid SAML response' unless response.is_valid?
+        raise InvalidCallback, 'SAML assertion never expires' unless response.not_on_or_after
         raise InvalidCallback, 'SAML response already used' unless first_use?(response)
 
         Auth.new(
@@ -46,6 +47,10 @@ module AnyAuth
           credentials: {},
           raw: response.attributes.all.to_h,
         )
+      end
+
+      def allow_idp_initiated
+        ActiveModel::Type::Boolean.new.cast(@allow_idp_initiated)
       end
 
       def metadata
@@ -91,17 +96,16 @@ module AnyAuth
       end
 
       def first_use?(response)
-        expires_at = response.not_on_or_after || 1.day.from_now
+        key = "any_auth:saml:#{idp_entity_id}:#{response.assertion_id}"
 
-        cache.write("any_auth:saml:#{idp_entity_id}:#{response.assertion_id}", true,
-          unless_exist: true, expires_at:)
+        cache.write(key, true, unless_exist: true, expires_at: response.not_on_or_after + 1.minute)
       end
 
       def cache
-        return @cache if @cache
-        return Rails.cache if defined?(Rails)
+        store = @cache || (Rails.cache if defined?(Rails))
+        return store unless store.nil? || store.is_a?(ActiveSupport::Cache::NullStore)
 
-        raise ArgumentError, "#{provider} needs a cache"
+        raise ArgumentError, "#{provider} needs a cache shared by every process to refuse replays"
       end
 
       def info_from(response)

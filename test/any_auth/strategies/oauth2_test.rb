@@ -161,7 +161,7 @@ module AnyAuth
         assert_includes error.message, 'client_id'
       end
 
-      test 'no challenge is sent unless PKCE is switched on' do
+      test 'no challenge is sent when PKCE is switched off' do
         without = Hubspot.new(client_id: 'app', client_secret: 'secret', pkce: false)
         request = without.request_phase(redirect_uri: CALLBACK_URL)
 
@@ -169,9 +169,9 @@ module AnyAuth
         assert_nil request.session['code_verifier']
       end
 
-      test 'with PKCE switched on, leaving sends a challenge and the swap sends its verifier' do
+      test 'leaving sends a PKCE challenge and the swap sends its verifier' do
         stub_json(:post, TOKEN_URL, access_token: 'new')
-        hubspot = Hubspot.new(client_id: 'app', client_secret: 'secret', pkce: true)
+        hubspot = Hubspot.new(client_id: 'app', client_secret: 'secret')
         request = hubspot.request_phase(redirect_uri: CALLBACK_URL)
         sent = query_of(request.url)
         verifier = request.session['code_verifier']
