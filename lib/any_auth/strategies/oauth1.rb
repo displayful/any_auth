@@ -8,8 +8,9 @@ rescue LoadError => e
 end
 
 unless CGI.respond_to?(:parse)
-  raise LoadError, 'AnyAuth::Strategies::OAuth1 needs the cgi gem on Ruby 4.0, where CGI.parse left ' \
-                   'Ruby itself and the oauth gem still calls it. Add gem "cgi" to your Gemfile.'
+  raise LoadError, 'AnyAuth::Strategies::OAuth1 needs the cgi gem on Ruby 4.0, where CGI.parse ' \
+                   'left Ruby itself and the oauth gem still calls it. ' \
+                   'Add gem "cgi" to your Gemfile.'
 end
 
 module AnyAuth
