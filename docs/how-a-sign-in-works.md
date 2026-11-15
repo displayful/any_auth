@@ -44,9 +44,12 @@ session[:any_auth] = {
 ```
 
 `authenticate_with_provider` takes the entry out before anything else, so it is
-used once; refuses it if it has expired or is for another provider; puts the
+used once; ignores it if it has expired or is for another provider; puts the
 fields back on the strategy; and calls `callback_phase` with the request's
-query string. `any_auth_params` reads `params` without taking the entry.
+query string and POST body (path parameters stay out). With nothing kept, the
+strategy decides: OAuth and the developer strategy refuse the callback, SAML
+accepts it on its signature. `any_auth_params` reads `params` without taking
+the entry.
 
 One sign-in at a time per browser: starting a second replaces the first. With
 the cookie session store, two requests finishing at once can overwrite each

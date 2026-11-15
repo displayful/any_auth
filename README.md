@@ -269,16 +269,32 @@ refresh token, as Shopify does, must not be refreshed twice at once. How a
 vendor wants the token sent on an API call is on its
 [strategy page](docs/strategies).
 
-### One client per customer
+### Configuring each sign-in (OmniAuth's setup phase)
 
-Options given to `AnyAuth.strategy` win over the configured ones, so a client
-can come from your database:
+OmniAuth runs a `setup` proc before each phase to change a strategy's options
+for that request, such as a customer's own client or IdP. In AnyAuth you build
+the strategy yourself, so the setup is the arguments you build it with.
+Options given to `AnyAuth.strategy` win over the configured ones:
 
 ```ruby
 config.provider :shopify, scope: "read_orders"
-
-AnyAuth.strategy(:shopify, client_id: tenant.client_id, client_secret: tenant.client_secret)
 ```
+
+```ruby
+class Auth::BaseController < ApplicationController
+  # …
+
+  private
+    def set_strategy
+      @strategy = AnyAuth.strategy(params[:provider], **Current.account.sign_in_options)
+    end
+end
+```
+
+Build it the same way in both actions; a `before_action` does that. Only the
+strategy's fields (such as Shopify's shop) travel to the callback with the
+sign-in. Its options do not, so a client id or certificate from your database
+must be looked up again, as above.
 
 ## Reference
 
@@ -354,6 +370,7 @@ unconfigured provider is a `KeyError`.
 | [`Tavle`](docs/strategies/tavle.md) | OAuth 2 | one more request, to name the member |
 | [`Shopify`](docs/strategies/shopify.md) | OAuth 2 with a field | per-shop endpoints, signed callback |
 | [`Economic`](docs/strategies/economic.md), [`Adversus`](docs/strategies/adversus.md) | fields only | |
+| [`Saml`](docs/strategies/saml.md) | SAML 2.0 | a customer's IdP; needs ruby-saml, loaded on request |
 | [`Developer`](docs/strategies/developer.md) | a field | sign in as anyone; development only, loaded on request |
 
 ## Writing a strategy
@@ -390,7 +407,7 @@ checked along the way.
 | `request.env["omniauth.auth"]` | the return value of `authenticate_with_provider` |
 | `omniauth.params`, `omniauth.origin` | `params:`, read back as `auth.params` |
 | `/auth/failure` | `rescue_from AnyAuth::Error` |
-| a `setup` proc | attributes passed to `AnyAuth.strategy` |
+| a `setup` proc | [the arguments you build the strategy with](#configuring-each-sign-in-omniauths-setup-phase) |
 | `extra.raw_info` | `auth.raw` |
 
 - Keep your provider names: `config.provider :google_oauth2, strategy: :google`.
@@ -426,8 +443,10 @@ Outside a controller, call `request_phase` and `callback_phase` yourself; see
 
 ## Limits
 
-- No SAML or OAuth 1. A callback that arrives as a cross-site `POST` is sent
-  on to a `GET` by your app, as [Apple's](docs/strategies/apple.md) is.
+- No OAuth 1.
+- A callback that arrives as a cross-site `POST` loses the session cookie.
+  Apple's is sent on to a `GET` ([its page](docs/strategies/apple.md)); SAML's
+  is accepted on its signature alone ([its page](docs/strategies/saml.md#the-trade-off)).
 - Endpoints are written in each strategy; there is no discovery.
 - The ID token is read from the token endpoint over TLS and checked for
   issuer, audience, expiry and nonce. Its signature is not verified, which

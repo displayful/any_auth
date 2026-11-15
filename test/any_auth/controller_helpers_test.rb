@@ -132,6 +132,14 @@ module AnyAuth
       assert_equal 'mette@acme.test', response.parsed_body['uid']
     end
 
+    test 'a provider that answers in a POST body is read the same way' do
+      post '/developer/leave', params: { email: 'Mette@Acme.test' }
+
+      post '/developer/home', params: { state: state_sent }
+
+      assert_equal 'mette@acme.test', response.parsed_body['uid']
+    end
+
     private
 
     def app

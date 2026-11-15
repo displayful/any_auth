@@ -26,6 +26,7 @@ back, and what is unusual about it.
 | [Shopify](strategies/shopify.md) | OAuth 2 with a field | a shop's Admin API |
 | [e-conomic](strategies/economic.md) | fields only | the e-conomic API |
 | [Adversus](strategies/adversus.md) | fields only | the Adversus API |
+| [SAML](strategies/saml.md) | SAML 2.0, with ruby-saml | signing in through a customer's IdP |
 | [Developer](strategies/developer.md) | a field and a trip to yourself | signing in locally, with no vendor |
 
 ## The three kinds

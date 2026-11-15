@@ -27,5 +27,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'rack'
   spec.add_development_dependency 'railties'
   spec.add_development_dependency 'rake'
+  spec.add_development_dependency 'ruby-saml', '>= 1.18.1'
   spec.add_development_dependency 'webmock'
 end

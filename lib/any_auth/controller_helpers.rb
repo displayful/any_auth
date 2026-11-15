@@ -20,15 +20,19 @@ module AnyAuth
     def authenticate_with_provider(strategy)
       stored = stored_any_auth_request(strategy)
       session.delete(:any_auth)
-      raise InvalidCallback, 'No sign-in in progress' if stored.empty?
 
-      strategy.assign_attributes(stored['attributes'].slice(*strategy.class.attribute_names))
-      auth = strategy.callback_phase(request.query_parameters, stored['request'])
-      auth.with(params: stored['params'])
+      attributes = stored.fetch('attributes', {})
+      strategy.assign_attributes(attributes.slice(*strategy.class.attribute_names))
+      auth = strategy.callback_phase(callback_params, stored.fetch('request', {}))
+      auth.with(params: stored.fetch('params', {}))
     end
 
     def any_auth_params(strategy)
       stored_any_auth_request(strategy).fetch('params', {})
+    end
+
+    def callback_params
+      request.query_parameters.merge(request.request_parameters)
     end
 
     def stored_any_auth_request(strategy)
