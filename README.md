@@ -396,20 +396,30 @@ unconfigured provider is a `KeyError`, a missing `client_id` an `ArgumentError`.
 ### A failure page, as with OmniAuth
 
 To send every failed sign-in to one page, as OmniAuth's `/auth/failure` does,
-use the helper:
+write the rescue once in the controller that signs people in:
 
 ```ruby
-rescue_from AnyAuth::AuthenticationError, with: :redirect_to_any_auth_failure
+rescue_from AnyAuth::AuthenticationError, with: :redirect_to_failure
 
+private
+  def redirect_to_failure(error)
+    Rails.error.report(error, handled: true)
+    message = error.code || error.class.name.demodulize.underscore
+
+    redirect_to auth_failure_path(message:, provider: params[:provider])
+  end
+```
+
+```ruby
 # config/routes.rb
 get "auth/failure", to: "auth/failures#show", as: :auth_failure
 ```
 
-It reports the error to `Rails.error` and redirects to
-`auth_failure_path(message:, provider:)`: `message` is the vendor's `code`, or
-the kind of failure (`access_denied`, `invalid_callback`, `unavailable`).
-Unlike OmniAuth's, it never sends a `ConfigurationError` there, and it behaves
-the same in every environment.
+`message` is the vendor's `code`, or the kind of failure (`access_denied`,
+`invalid_callback`, `unavailable`). Keep `error.description` out of the
+address: it is the vendor's text, for logs. Unlike OmniAuth's failure page,
+this never receives a `ConfigurationError`, and it behaves the same in every
+environment.
 
 ### Strategies
 
@@ -461,7 +471,7 @@ checked along the way.
 | `/auth/:provider` and its callback, by the middleware | two routes and actions of your own |
 | `request.env["omniauth.auth"]` | the return value of `authenticate_with_provider` |
 | `omniauth.params`, `omniauth.origin` | `params:`, read back as `auth.params` |
-| `/auth/failure` | `rescue_from AnyAuth::AuthenticationError`, or [the failure page helper](#a-failure-page-as-with-omniauth) |
+| `/auth/failure` | `rescue_from AnyAuth::AuthenticationError`, or [a failure page of your own](#a-failure-page-as-with-omniauth) |
 | a `setup` proc | [the arguments you build the strategy with](#configuring-each-sign-in-omniauths-setup-phase) |
 | `extra.raw_info` | `auth.raw` |
 

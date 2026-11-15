@@ -31,13 +31,6 @@ module AnyAuth
       stored_any_auth_request(strategy).fetch('params', {})
     end
 
-    def redirect_to_any_auth_failure(error)
-      Rails.error.report(error, handled: true)
-      message = error.code || error.class.name.demodulize.underscore
-
-      redirect_to auth_failure_path(message:, provider: params[:provider])
-    end
-
     def callback_params
       request.query_parameters.merge(request.request_parameters)
     end
