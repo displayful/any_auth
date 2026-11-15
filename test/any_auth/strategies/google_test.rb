@@ -37,13 +37,19 @@ module AnyAuth
         assert_raises(InvalidCallback) { auth(sub: nil) }
       end
 
+      test 'with a Workspace domain asked for, a token from another domain is refused' do
+        assert_raises(InvalidCallback) { auth(hd: 'elsewhere.test', asked_for: 'acme.test') }
+
+        assert_equal 'acme.test', auth(hd: 'acme.test', asked_for: 'acme.test').raw['hd']
+      end
+
       private
 
       def info(**claims)
         auth(**claims).info
       end
 
-      def auth(**claims)
+      def auth(asked_for: nil, **claims)
         claims = {
           sub: 'g-1',
           iss: 'https://accounts.google.com',
@@ -52,7 +58,7 @@ module AnyAuth
           nonce: 'n',
         }.merge(claims)
         stub_json(:post, TOKEN_URL, access_token: 'access', id_token: id_token(claims))
-        google = Google.new(client_id: 'app', client_secret: 'secret')
+        google = Google.new(client_id: 'app', client_secret: 'secret', hd: asked_for)
 
         google.callback_phase(callback_params, stored_session(nonce: 'n'))
       end

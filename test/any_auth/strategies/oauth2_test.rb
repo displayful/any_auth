@@ -162,7 +162,8 @@ module AnyAuth
       end
 
       test 'no challenge is sent unless PKCE is switched on' do
-        request = hubspot.request_phase(redirect_uri: CALLBACK_URL)
+        without = Hubspot.new(client_id: 'app', client_secret: 'secret', pkce: false)
+        request = without.request_phase(redirect_uri: CALLBACK_URL)
 
         assert_nil query_of(request.url)['code_challenge']
         assert_nil request.session['code_verifier']

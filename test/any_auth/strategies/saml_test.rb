@@ -66,7 +66,7 @@ module AnyAuth
           assertion_consumer_service_url: CALLBACK_URL)
 
         error = assert_raises(ArgumentError) do
-          incomplete.callback_phase({ 'SAMLResponse' => signed_response }, {})
+          incomplete.callback_phase({ 'SAMLResponse' => signed_response }, KEPT)
         end
 
         assert_includes error.message, 'idp_entity_id'
@@ -81,10 +81,26 @@ module AnyAuth
         assert_raises(InvalidCallback) { post_back(elsewhere) }
       end
 
-      test 'when the sign-in was kept, a response to another request is refused' do
-        answer = { 'SAMLResponse' => signed_response(in_response_to: '_another') }
+      test 'a response to another request is refused' do
+        assert_raises(InvalidCallback) { post_back(signed_response(in_response_to: '_another')) }
+      end
 
-        assert_raises(InvalidCallback) { saml.callback_phase(answer, { 'request_id' => '_ours' }) }
+      test 'a response nobody asked for is refused, unless the IdP may start sign-ins' do
+        unasked = { 'SAMLResponse' => signed_response(in_response_to: nil) }
+        idp_initiated = saml
+        idp_initiated.allow_idp_initiated = true
+
+        assert_raises(InvalidCallback) { saml.callback_phase(unasked, {}) }
+        assert_equal 'saml', idp_initiated.callback_phase(unasked, {}).provider
+      end
+
+      test 'a response used once is refused the second time' do
+        once = saml
+        response = signed_response
+
+        once.callback_phase({ 'SAMLResponse' => response }, KEPT)
+
+        assert_raises(InvalidCallback) { once.callback_phase({ 'SAMLResponse' => response }, KEPT) }
       end
 
       test 'a person the IdP could not authenticate is AccessDenied, with its status' do
@@ -95,20 +111,20 @@ module AnyAuth
         assert_includes refused.code, 'AuthnFailed'
       end
 
-      test 'an IdP that cannot answer is Unavailable' do
-        down = signed_response(status: %w[Responder])
+      test 'a failure status, which an IdP need not sign, carries none of its own text' do
+        forged = response_xml(audience: SP_ENTITY_ID, not_on_or_after: 5.minutes.from_now.iso8601,
+          in_response_to: '_ours', status: %w[Requester])
+        message = '<samlp:StatusMessage>forged</samlp:StatusMessage>'
+        forged = forged.sub('</samlp:Status>', "#{message}</samlp:Status>")
 
-        assert_raises(Unavailable) { post_back(down) }
-      end
+        refused = assert_raises(AccessDenied) { post_back(Base64.strict_encode64(forged)) }
 
-      test 'an IdP saying our request is wrong is a ConfigurationError' do
-        rejected = signed_response(status: %w[Requester])
-
-        assert_raises(ConfigurationError) { post_back(rejected) }
+        assert_nil refused.description
+        assert_not_includes refused.message, 'forged'
       end
 
       test 'a callback with no response is not a sign-in' do
-        assert_raises(InvalidCallback) { saml.callback_phase({}, {}) }
+        assert_raises(InvalidCallback) { saml.callback_phase({}, KEPT) }
       end
 
       test 'the metadata names where the IdP sends people back, before the IdP is set up' do
@@ -133,8 +149,10 @@ module AnyAuth
         certificate.sign(KEY, OpenSSL::Digest.new('SHA256'))
       end
 
+      KEPT = { 'request_id' => '_ours' }.freeze
+
       def post_back(response)
-        saml.callback_phase({ 'SAMLResponse' => response }, {})
+        saml.callback_phase({ 'SAMLResponse' => response }, KEPT)
       end
 
       def saml
@@ -144,11 +162,12 @@ module AnyAuth
           idp_cert: CERTIFICATE.to_pem,
           sp_entity_id: SP_ENTITY_ID,
           assertion_consumer_service_url: CALLBACK_URL,
+          cache: ActiveSupport::Cache::MemoryStore.new,
         )
       end
 
       def signed_response(key: KEY, audience: SP_ENTITY_ID, name_id: 'mette@acme.test',
-                          not_on_or_after: 5.minutes.from_now, in_response_to: nil,
+                          not_on_or_after: 5.minutes.from_now, in_response_to: '_ours',
                           status: %w[Success])
         xml = response_xml(audience:, name_id:, not_on_or_after: not_on_or_after.utc.iso8601,
           in_response_to:, status:)

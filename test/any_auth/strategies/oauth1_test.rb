@@ -31,7 +31,7 @@ module AnyAuth
 
       test 'leaving asks for a request token with our callback, and sends the person on' do
         stub_form(:post, REQUEST_TOKEN_URL, oauth_token: 'request',
-          oauth_token_secret: 'request-secret')
+          oauth_token_secret: 'request-secret', oauth_callback_confirmed: true)
 
         request = vendor.request_phase(redirect_uri: CALLBACK_URL)
 
@@ -39,6 +39,13 @@ module AnyAuth
         assert_equal KEPT, request.session
         assert_requested :post, REQUEST_TOKEN_URL,
           headers: { 'Authorization' => /oauth_callback="#{CGI.escape(CALLBACK_URL)}"/ }
+      end
+
+      test 'a vendor that does not confirm our callback speaks OAuth 1.0, which is refused' do
+        stub_form(:post, REQUEST_TOKEN_URL, oauth_token: 'request',
+          oauth_token_secret: 'request-secret')
+
+        assert_raises(ConfigurationError) { vendor.request_phase(redirect_uri: CALLBACK_URL) }
       end
 
       test 'coming back swaps the verifier for a token and its secret, then asks who it is' do

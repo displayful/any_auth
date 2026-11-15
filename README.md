@@ -5,7 +5,7 @@ to vendors' APIs, from your own Rails controllers. One strategy class per
 vendor, with the request and callback phases OmniAuth names, and no Rack
 middleware.
 
-Needs Ruby 3.4, Rails 8 and a session.
+Needs Ruby 3.4 and Rails 8.
 
 - [Sign in with Google and Microsoft](#sign-in-with-google-and-microsoft)
 - [Connect to a vendor's API](#connect-to-a-vendors-api)
@@ -102,8 +102,8 @@ class Auth::CallbacksController < Auth::BaseController
 end
 ```
 
-`redirect_to_provider` keeps what the callback needs in the session and sends
-the person to the vendor. `authenticate_with_provider` checks the callback,
+`redirect_to_provider` keeps what the callback needs in a short-lived
+encrypted cookie of its own and sends the person to the vendor. `authenticate_with_provider` checks the callback,
 swaps the code for tokens, asks who signed in and returns an `auth`. A failed
 or refused sign-in raises an `AnyAuth::AuthenticationError`, and the person
 lands back on the sign-in page. A setup mistake the vendor reports, such as a
@@ -174,8 +174,8 @@ auth = authenticate_with_provider(@strategy)
 auth.params["invitation"]
 ```
 
-It goes through the session as JSON, so its keys come back as strings. Keep
-it small: Rails' cookie session holds 4 KB, and a large `params:` raises
+It goes through a cookie as JSON, so its keys come back as strings. Keep it
+small: a cookie holds 4 KB, and a large `params:` raises
 `ActionDispatch::Cookies::CookieOverflow` when the person leaves.
 
 ## Connect to a vendor's API
@@ -338,7 +338,7 @@ when the strategy is built.
 
 | | |
 | --- | --- |
-| `redirect_to_provider(strategy, redirect_uri:, params: {})` | keeps the sign-in in the session and redirects to the vendor |
+| `redirect_to_provider(strategy, redirect_uri:, params: {})` | keeps the sign-in in its own cookie and redirects to the vendor |
 | `authenticate_with_provider(strategy)` | checks the callback, swaps the code and returns the `auth` |
 | `any_auth_params(strategy)` | the `params:` you passed, readable before the code is swapped and when the sign-in fails |
 
@@ -425,7 +425,7 @@ environment.
 | --- | --- | --- |
 | [`Google`](docs/strategies/google.md) | OpenID Connect | sign-in and Google APIs |
 | [`Microsoft`](docs/strategies/microsoft.md) | OpenID Connect | work, school and personal accounts |
-| [`Apple`](docs/strategies/apple.md) | OpenID Connect | signed client secret; the callback is a `POST` you send on |
+| [`Apple`](docs/strategies/apple.md) | OpenID Connect | signed client secret; the callback is a `POST` |
 | [`Hubspot`](docs/strategies/hubspot.md) | OAuth 2 | one more request, to name the user |
 | [`Relatel`](docs/strategies/relatel.md) | OAuth 2 | one more request, to name the employee |
 | [`Tavle`](docs/strategies/tavle.md) | OAuth 2 | one more request, to name the member |
@@ -506,9 +506,8 @@ Outside a controller, call `request_phase` and `callback_phase` yourself; see
 
 ## Limits
 
-- A callback that arrives as a cross-site `POST` loses the session cookie.
-  Apple's is sent on to a `GET` ([its page](docs/strategies/apple.md)); SAML's
-  is accepted on its signature alone ([its page](docs/strategies/saml.md#the-trade-off)).
+- A callback that arrives as a cross-site `POST` (Apple, SAML) needs HTTPS,
+  so the sign-in's cookie can come back with it.
 - Endpoints are written in each strategy; there is no discovery.
 - The ID token is read from the token endpoint over TLS and checked for
   issuer, audience, expiry and nonce. Its signature is not verified, which

@@ -32,9 +32,7 @@ is refused.
 ## The callback is a POST
 
 Apple posts `code`, `state` and `user` to your callback from its own page.
-The browser leaves the session cookie out of that request (`SameSite=Lax`),
-so nothing can be checked there. Accept the `POST` and send it on to your
-`GET` callback, which then works as for any other strategy:
+Accept the `POST` and skip forgery protection for that one action:
 
 ```ruby
 # config/routes.rb
@@ -50,19 +48,20 @@ class Auth::CallbacksController < Auth::BaseController
   skip_forgery_protection only: :create
 
   def create
-    answer = request.request_parameters.slice("code", "state", "user", "error")
-    redirect_to auth_callback_url(params[:provider], answer), status: :see_other
+    show
   end
 
   def show
-    # as for every provider
+    # as for every provider: authenticate_with_provider reads the POST body
   end
 end
 ```
 
-Skipping forgery protection is safe for that one action: it changes nothing,
-and the state is still checked against the session on the `GET`. The routes
-and controllers are the ones in the [README](../../README.md#3-add-the-routes).
+Skipping forgery protection is safe there: the sign-in under way is kept in
+its own cookie, `__Host-any_auth`, which is `SameSite=None` so it comes back
+on Apple's `POST`, and Apple's `state` must match it. The code never appears
+in an address. This needs HTTPS, which Apple requires anyway; behind a proxy,
+Rails must see it (`config.assume_ssl = true`, the Rails 8 default).
 
 ## What comes back
 

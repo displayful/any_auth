@@ -24,6 +24,10 @@ module AnyAuth
         )
       end
 
+      def valid_claims?(claims, session)
+        super && (hd.blank? || claims['hd'] == hd)
+      end
+
       def valid_issuer?(claims)
         claims['iss'].in?(%w[https://accounts.google.com accounts.google.com])
       end

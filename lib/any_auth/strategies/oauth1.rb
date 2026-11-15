@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 begin
-  gem 'oauth', '>= 1.1'
+  gem 'oauth', '>= 1.1.6'
   require 'oauth'
 rescue LoadError => e
-  raise LoadError, "AnyAuth::Strategies::OAuth1 needs the oauth gem: #{e.message}"
+  raise LoadError, "AnyAuth::Strategies::OAuth1 needs oauth 1.1.6 or later: #{e.message}"
 end
 
 unless CGI.respond_to?(:parse)
@@ -22,6 +22,8 @@ module AnyAuth
         request_token = with_error_handling do
           consumer.get_request_token(oauth_callback: redirect_uri)
         end
+        raise ConfigurationError, "#{provider} did not confirm the callback" unless
+          request_token.callback_confirmed?
         session = {
           'request_token' => request_token.token,
           'request_token_secret' => request_token.secret,

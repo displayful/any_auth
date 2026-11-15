@@ -1,6 +1,6 @@
 # How a sign-in works
 
-What happens between the button and the `auth`, what is kept in the session,
+What happens between the button and the `auth`, what is kept in a cookie,
 and what is checked on the way back.
 
 ## The two phases
@@ -11,7 +11,7 @@ your create action            vendor                 your callback action
 redirect_to_provider    ──▶   person signs in   ──▶  authenticate_with_provider
   request_phase                                        callback_phase
   keeps the sign-in                                      verify
-  in the session                                         fetch_access_token
+  in a cookie                                            fetch_access_token
                                                          identity
                                                        ◀── auth
 ```
@@ -31,10 +31,11 @@ and returns the `AnyAuth::Auth`.
 
 ## What the controller helper keeps
 
-`redirect_to_provider` stores one entry in the Rails session:
+`redirect_to_provider` keeps one entry in its own encrypted cookie, not in
+the app's session:
 
 ```ruby
-session[:any_auth] = {
+cookies.encrypted["__Host-any_auth"] = {
   "provider" => "google",           # the callback must be for the same provider
   "request" => { … },               # request.session, from above
   "attributes" => { "shop" => … },  # the strategy's fields, to put back
@@ -43,18 +44,23 @@ session[:any_auth] = {
 }
 ```
 
-`authenticate_with_provider` takes the entry out before anything else, so it is
+Over HTTPS the cookie is `Secure`, `HttpOnly`, `SameSite=None` and
+`Path=/`, with no `Domain`: the `__Host-` prefix makes browsers refuse it from
+anywhere but your own host, so a subdomain cannot plant one. `SameSite=None`
+lets it come back on a provider's cross-site `POST` (Apple, SAML); sending it
+there is safe because what it holds must match the provider's answer. Over
+plain HTTP, as in tests, it is a `SameSite=Lax` cookie named `any_auth`, and
+`POST` callbacks do not work.
+
+`authenticate_with_provider` deletes the cookie before anything else, so it is
 used once; ignores it if it has expired or is for another provider; puts the
 fields back on the strategy; and calls `callback_phase` with the request's
-query string and POST body (path parameters stay out). With nothing kept, the
-strategy decides: OAuth 2 and the developer strategy refuse the callback, SAML
-accepts it on its signature. `any_auth_params` reads `params` without taking
-the entry.
+query string and POST body (path parameters stay out). With nothing kept,
+every strategy refuses the callback, except SAML built with
+`allow_idp_initiated: true`. `any_auth_params` reads `params` without
+deleting the cookie.
 
-One sign-in at a time per browser: starting a second replaces the first. With
-the cookie session store, two requests finishing at once can overwrite each
-other's session, so a sign-in started in one tab while another request is in
-flight can be lost; the person starts again.
+One sign-in at a time per browser: starting a second replaces the first.
 
 ## What is checked on the way back
 
@@ -108,9 +114,8 @@ Every request to the vendor goes through one place, which maps what went wrong:
 
 `code` and `description` are the vendor's own, or nil. The library adds no
 codes of its own: the class says what kind of failure it was. OAuth 1 reads
-`oauth_problem` and `oauth_problem_advice`; SAML reads its status
-(`AuthnFailed`, `RequestDenied` and `NoPassive` are `AccessDenied`,
-`Responder` is `Unavailable`, others are `ConfigurationError`).
+`oauth_problem` and `oauth_problem_advice`. A SAML failure is always
+`AccessDenied` with its status as `code`, since IdPs need not sign failures.
 
 Messages name the provider and the vendor's code, never a token or the
 vendor's body, and the original exception is dropped (`cause: nil`), because
@@ -130,7 +135,7 @@ Outside a Rails controller, call the phases yourself:
 ```ruby
 request = strategy.request_phase(redirect_uri: "https://app.test/callback")
 request.url       # where to send the person
-request.session   # keep it, server-side or signed, until they come back
+request.session   # keep it, encrypted or server-side, until they come back
 
 auth = strategy.callback_phase(query, request.session)   # string-keyed hashes
 ```

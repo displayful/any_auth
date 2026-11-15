@@ -133,6 +133,31 @@ module AnyAuth
       assert_equal 'mette@acme.test', response.parsed_body['uid']
     end
 
+    test 'over HTTPS the sign-in under way is kept in a cookie a provider can POST back to' do
+      https!
+      post '/hubspot/leave'
+
+      kept = set_cookie('__Host-any_auth')
+
+      assert_match(/; secure/i, kept)
+      assert_match(/; samesite=none/i, kept)
+      assert_match(/; httponly/i, kept)
+      assert_match(%r{; path=/(;|\z)}i, kept)
+      assert_no_match(/; domain=/i, kept)
+
+      get '/hubspot/home', params: { code: 'code', state: state_sent }
+      deleted = set_cookie('__Host-any_auth')
+
+      assert_response :success
+      assert_match(/; secure/i, deleted)
+    end
+
+    test "nothing about a sign-in is kept in the app's own session" do
+      post '/hubspot/leave'
+
+      assert_empty session.to_hash.except('session_id')
+    end
+
     test 'a provider that answers in a POST body is read the same way' do
       post '/developer/leave', params: { email: 'Mette@Acme.test' }
 
@@ -145,6 +170,10 @@ module AnyAuth
 
     def app
       TestApp
+    end
+
+    def set_cookie(name)
+      Array(response.headers['Set-Cookie']).join("\n").lines.find { it.start_with?("#{name}=") }
     end
 
     def state_sent

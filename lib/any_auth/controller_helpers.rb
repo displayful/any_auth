@@ -6,20 +6,23 @@ module AnyAuth
 
     def redirect_to_provider(strategy, redirect_uri:, params: {})
       auth_request = strategy.request_phase(redirect_uri:)
-      session[:any_auth] = {
+      stored = {
         'provider' => strategy.provider,
         'request' => auth_request.session,
         'attributes' => strategy.attributes,
         'params' => params,
         'expires_at' => 10.minutes.from_now.to_i,
       }
+      cookies.encrypted[any_auth_cookie_name] = {
+        value: stored, expires: 10.minutes, httponly: true, **any_auth_cookie_options
+      }
 
       redirect_to auth_request.url, allow_other_host: true
     end
 
     def authenticate_with_provider(strategy)
-      stored = stored_any_auth_request(strategy)
-      session.delete(:any_auth)
+      stored = any_auth_cookie(strategy)
+      cookies.delete(any_auth_cookie_name, **any_auth_cookie_options)
 
       attributes = stored.fetch('attributes', {})
       strategy.assign_attributes(attributes.slice(*strategy.class.attribute_names))
@@ -28,19 +31,31 @@ module AnyAuth
     end
 
     def any_auth_params(strategy)
-      stored_any_auth_request(strategy).fetch('params', {})
+      any_auth_cookie(strategy).fetch('params', {})
     end
 
     def callback_params
       request.query_parameters.merge(request.request_parameters)
     end
 
-    def stored_any_auth_request(strategy)
-      stored = session[:any_auth]
-      return {} unless stored && stored['provider'] == strategy.provider
-      return {} unless Time.at(stored['expires_at']).future?
+    def any_auth_cookie(strategy)
+      stored = cookies.encrypted[any_auth_cookie_name]
+      return {} unless stored.is_a?(Hash) && stored['provider'] == strategy.provider
+      return {} unless Time.at(stored['expires_at'].to_i).future?
 
       stored
+    end
+
+    def any_auth_cookie_name
+      return '__Host-any_auth' if request.ssl?
+
+      'any_auth'
+    end
+
+    def any_auth_cookie_options
+      return { secure: true, same_site: :none } if request.ssl?
+
+      { same_site: :lax }
     end
   end
 end

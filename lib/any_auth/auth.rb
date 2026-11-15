@@ -9,5 +9,13 @@ module AnyAuth
     def inspect
       "#<data #{self.class.name} provider=#{provider.inspect}, uid=#{uid.inspect}>"
     end
+
+    def pretty_print(printer)
+      printer.text(inspect)
+    end
+
+    def as_json(*)
+      to_h.except(:credentials).as_json
+    end
   end
 end

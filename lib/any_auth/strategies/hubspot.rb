@@ -3,6 +3,8 @@
 module AnyAuth
   module Strategies
     class Hubspot < OAuth2
+      self.pkce = true
+
       def client_options
         {
           site: 'https://api.hubspot.com',

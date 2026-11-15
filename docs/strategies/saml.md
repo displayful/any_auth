@@ -5,8 +5,8 @@ Google Workspace, OneLogin…) over SAML 2.0. Built on
 [ruby-saml](https://github.com/SAML-Toolkits/ruby-saml), which checks the XML
 signature.
 
-If the customer's IdP also speaks OpenID Connect, prefer that: it has none of
-the trade-offs below.
+If the customer's IdP also speaks OpenID Connect, prefer that: it is simpler
+to set up and has no XML to sign.
 
 ## Install
 
@@ -50,12 +50,14 @@ AnyAuth.strategy(:saml,
 | `idp_entity_id` | the IdP's entity ID; the response's issuer must match |
 | `sp_entity_id` | your entity ID; the response's audience must match |
 | `assertion_consumer_service_url` | your callback; the response must be addressed to it |
+| `allow_idp_initiated` | accept sign-ins started at the IdP; off by default (see below) |
+| `cache` | where used assertion IDs are kept; defaults to `Rails.cache` |
 | `name_identifier_format` | the NameID format to ask for, such as `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` |
 
 The first five are required: a strategy missing any of them raises
 `ArgumentError` naming it, because ruby-saml quietly skips the check a missing
 setting would make. Set `assertion_consumer_service_url` when building the
-strategy for the callback too: the session is usually gone there (see below).
+strategy for the callback too.
 `metadata` needs only `sp_entity_id` and `assertion_consumer_service_url`, so
 you can hand it to a customer before their IdP is set up.
 
@@ -73,8 +75,7 @@ end
 ## The callback is a POST
 
 The IdP posts `SAMLResponse` to your callback from its own page. Accept the
-`POST` and skip forgery protection for that action; the response is checked
-by its signature instead:
+`POST` and skip forgery protection for that action:
 
 ```ruby
 # config/routes.rb, inside the auth scope
@@ -86,10 +87,15 @@ class Auth::CallbacksController < Auth::BaseController
   skip_forgery_protection only: :create
 
   def create
-    # the same as show: authenticate_with_provider reads the POST body
+    show
   end
 end
 ```
+
+The sign-in under way is kept in its own cookie, `__Host-any_auth`, which is
+`SameSite=None` so it comes back on the IdP's `POST`; the response must
+answer the request kept there (`InResponseTo`). This needs HTTPS; behind a
+proxy, Rails must see it (`config.assume_ssl = true`, the Rails 8 default).
 
 ## What comes back
 
@@ -116,21 +122,24 @@ ruby-saml checks the signature against `idp_cert`, the issuer, the audience,
 the destination and recipient, and the timestamps (with five seconds of
 clock drift). Two of its checks are stricter than its defaults: the response
 must name your entity ID as its audience, and must name a person (a NameID).
-An invalid response is an `AnyAuth::InvalidCallback`, a refusal from the IdP an `AnyAuth::AccessDenied`; a callback without one is
-an `AnyAuth::InvalidCallback`.
+It then refuses, as an `AnyAuth::InvalidCallback`:
 
-## The trade-off
+- a response to a request this browser did not make, or to none at all;
+- a response it has already accepted once: each assertion ID is recorded
+  until the assertion expires, in `Rails.cache` or the `cache:` you pass. The
+  cache must be shared by every process, as Solid Cache or Redis is; a memory
+  store in each process lets a replay through on another one.
 
-This is the trade-off omniauth-saml makes too.
+A failure from the IdP is an `AnyAuth::AccessDenied`. IdPs often leave
+failures unsigned, so `code` keeps only the SAML status (such as
+`urn:oasis:names:tc:SAML:2.0:status:AuthnFailed`) and nothing the IdP wrote.
 
-The IdP's `POST` comes from another site, and Rails' session cookie is
-`SameSite=Lax`, so the browser does not send it. The response therefore cannot
-be tied to a sign-in this browser started: `InResponseTo` is checked only when
-the session happens to be there. As a result:
+## Sign-in started at the IdP
 
-- A response is accepted on its signature alone, until it expires (usually a
-  few minutes). A captured response can be replayed in that window; record
-  each assertion's ID (`auth.raw` does not include it) if that matters to you.
-- Sign-in started from the IdP's own dashboard (IdP-initiated) is accepted.
+A sign-in started from the IdP's own dashboard (IdP-initiated) answers no
+request, so it is refused. To accept it, build the strategy with
+`allow_idp_initiated: true`. Anyone with a valid assertion of their own can
+then sign a visitor in as themselves (login CSRF), which is the reason SAML's
+profile calls such responses unsolicited; replays are still refused.
 
 Single logout is not supported.

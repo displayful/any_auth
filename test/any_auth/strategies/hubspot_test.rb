@@ -25,6 +25,18 @@ module AnyAuth
         assert_nil auth.raw['token']
       end
 
+      test 'leaving sends a PKCE challenge, and the swap sends its verifier' do
+        hubspot = Hubspot.new(client_id: 'app', client_secret: 'secret')
+        request = hubspot.request_phase(redirect_uri: CALLBACK_URL)
+        verifier = request.session['code_verifier']
+        stub_json(:post, INTROSPECT_URL, active: true, user_id: 41)
+
+        hubspot.callback_phase(callback_params, stored_session(code_verifier: verifier))
+
+        assert_equal challenge_for(verifier), query_of(request.url)['code_challenge']
+        assert_requested :post, TOKEN_URL, body: hash_including(code_verifier: verifier)
+      end
+
       test 'the token is asked about in the body, never in the address' do
         asked = stub_json(:post, INTROSPECT_URL, active: true, user_id: 41)
           .with(body: { client_id: 'app', client_secret: 'secret',

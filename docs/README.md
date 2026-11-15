@@ -6,7 +6,7 @@ and connecting to a vendor's API. These pages go one level down.
 ## Guides
 
 - [How a sign-in works](how-a-sign-in-works.md): the two phases, what is kept
-  in the session, and every check on the way back.
+  in a cookie, and every check on the way back.
 - [Adding a strategy](adding-a-strategy.md): a new OAuth 2, OpenID Connect or
   fields-only vendor, with tests.
 

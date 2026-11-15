@@ -10,8 +10,11 @@ end
 module AnyAuth
   module Strategies
     class Saml < Base
+      STATUS = /\Aurn:oasis:names:tc:SAML:2\.0:status:\w+\z/
+
       attr_accessor :idp_sso_service_url, :idp_cert, :idp_entity_id, :sp_entity_id,
-        :assertion_consumer_service_url, :name_identifier_format
+        :assertion_consumer_service_url, :name_identifier_format, :allow_idp_initiated
+      attr_writer :cache
 
       def request_phase(redirect_uri:)
         authn_request = OneLogin::RubySaml::Authrequest.new
@@ -23,6 +26,7 @@ module AnyAuth
 
       def callback_phase(params, session)
         raise InvalidCallback, 'Missing SAMLResponse' if params['SAMLResponse'].blank?
+        raise InvalidCallback, 'No sign-in in progress' unless requested?(session)
 
         response = OneLogin::RubySaml::Response.new(
           params['SAMLResponse'],
@@ -30,8 +34,10 @@ module AnyAuth
           matches_request_id: session['request_id'],
           allowed_clock_drift: 5.seconds,
         )
-        raise error_from(nil, response) unless response.success?
+        raise AccessDenied.new('SAML sign-in refused', code: status_code(response)) unless
+          response.success?
         raise InvalidCallback, 'Invalid SAML response' unless response.is_valid?
+        raise InvalidCallback, 'SAML response already used' unless first_use?(response)
 
         Auth.new(
           provider:,
@@ -74,21 +80,28 @@ module AnyAuth
         raise ArgumentError, "#{provider} needs #{missing.to_sentence}" if missing.any?
       end
 
-      def error_code(response)
-        response.status_code
+      def requested?(session)
+        session['request_id'].present? || allow_idp_initiated
       end
 
-      def error_description(response)
-        response.status_message
+      def status_code(response)
+        codes = response.status_code.to_s.split(' | ')
+
+        response.status_code if codes.all? { it.match?(STATUS) }
       end
 
-      def error_class_for(code, _status)
-        case code
-        when nil then InvalidCallback
-        when /RequestDenied|AuthnFailed|NoPassive|UnknownPrincipal/ then AccessDenied
-        when /Responder/ then Unavailable
-        else ConfigurationError
-        end
+      def first_use?(response)
+        expires_at = response.not_on_or_after || 1.day.from_now
+
+        cache.write("any_auth:saml:#{idp_entity_id}:#{response.assertion_id}", true,
+          unless_exist: true, expires_at:)
+      end
+
+      def cache
+        return @cache if @cache
+        return Rails.cache if defined?(Rails)
+
+        raise ArgumentError, "#{provider} needs a cache"
       end
 
       def info_from(response)
