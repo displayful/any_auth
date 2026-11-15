@@ -26,6 +26,10 @@ module AnyAuth
       @retry_after = retry_after
       super(message)
     end
+
+    def reason
+      code || self.class.name.demodulize.underscore
+    end
   end
 
   class AuthenticationError < Error; end

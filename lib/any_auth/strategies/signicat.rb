@@ -17,10 +17,8 @@ module AnyAuth
       end
 
       def client_options
-        site = URI::HTTPS.build(host: domain).to_s
-
         {
-          site:,
+          site: issuer,
           authorize_url: '/auth/open/connect/authorize',
           token_url: '/auth/open/connect/token',
         }
@@ -52,8 +50,12 @@ module AnyAuth
         super && requested_eid?(claims) && requested_level?(claims)
       end
 
+      def issuer
+        URI::HTTPS.build(host: domain, path: '/auth/open').to_s
+      end
+
       def valid_issuer?(claims)
-        claims['iss'] == "https://#{domain}/auth/open"
+        claims['iss'] == issuer
       end
 
       def requested_eid?(claims)

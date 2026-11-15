@@ -380,7 +380,8 @@ AnyAuth::Error
 Every error carries what the vendor said: `code` (its own word, such as
 `invalid_grant`, or nil), `description` (its explanation, for logs; never show
 it to people, it can be forged) and `retry_after` (seconds, when the vendor
-says when to try again).
+says when to try again). `reason` is the vendor's code, or the kind of
+failure when it gave none: `invalid_callback`, `access_denied`, `unavailable`.
 
 ```ruby
 rescue_from AnyAuth::AuthenticationError, with: :refused
@@ -404,9 +405,7 @@ rescue_from AnyAuth::AuthenticationError, with: :redirect_to_failure
 private
   def redirect_to_failure(error)
     Rails.error.report(error, handled: true)
-    message = error.code || error.class.name.demodulize.underscore
-
-    redirect_to auth_failure_path(message:, provider: params[:provider])
+    redirect_to auth_failure_path(message: error.reason, provider: params[:provider])
   end
 ```
 
@@ -415,8 +414,7 @@ private
 get "auth/failure", to: "auth/failures#show", as: :auth_failure
 ```
 
-`message` is the vendor's `code`, or the kind of failure (`access_denied`,
-`invalid_callback`, `unavailable`). Keep `error.description` out of the
+Keep `error.description` out of the
 address: it is the vendor's text, for logs. Unlike OmniAuth's failure page,
 this never receives a `ConfigurationError`, and it behaves the same in every
 environment.
