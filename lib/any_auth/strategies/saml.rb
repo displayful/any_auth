@@ -1,15 +1,10 @@
 # frozen_string_literal: true
 
 begin
+  gem 'ruby-saml', '>= 1.18.1'
   require 'onelogin/ruby-saml'
-rescue LoadError
-  raise LoadError, 'AnyAuth::Strategies::Saml needs the ruby-saml gem, 1.18.1 or later. ' \
-                   'Add it to your Gemfile.'
-end
-
-if Gem::Version.new(OneLogin::RubySaml::VERSION) < Gem::Version.new('1.18.1')
-  raise LoadError, "AnyAuth::Strategies::Saml needs ruby-saml 1.18.1 or later; " \
-                   "#{OneLogin::RubySaml::VERSION} has known signature bypasses."
+rescue LoadError => e
+  raise LoadError, "AnyAuth::Strategies::Saml needs ruby-saml 1.18.1 or later: #{e.message}"
 end
 
 module AnyAuth
@@ -21,7 +16,6 @@ module AnyAuth
       def request_phase(redirect_uri:)
         authn_request = OneLogin::RubySaml::Authrequest.new
         url = authn_request.create(settings(redirect_uri))
-
         session = { 'redirect_uri' => redirect_uri, 'request_id' => authn_request.request_id }
 
         Request.new(url:, session:)
@@ -38,25 +32,45 @@ module AnyAuth
         )
         raise Unauthorized, 'Invalid SAML response' unless response.is_valid?
 
-        Auth.new(provider:, uid: response.name_id, info: info_from(response), credentials: {},
-          raw: response.attributes.all.to_h)
+        Auth.new(
+          provider:,
+          uid: "#{idp_entity_id}:#{response.name_id}",
+          info: info_from(response),
+          credentials: {},
+          raw: response.attributes.all.to_h,
+        )
       end
 
       def metadata
-        OneLogin::RubySaml::Metadata.new.generate(settings)
+        settings = service_provider
+        require_present(settings)
+
+        OneLogin::RubySaml::Metadata.new.generate(OneLogin::RubySaml::Settings.new(settings))
       end
 
       private
 
       def settings(redirect_uri = nil)
-        OneLogin::RubySaml::Settings.new(
-          idp_sso_service_url:,
-          idp_cert:,
-          idp_entity_id:,
-          sp_entity_id:,
-          name_identifier_format:,
-          assertion_consumer_service_url: assertion_consumer_service_url || redirect_uri,
-        )
+        settings = identity_provider.merge(service_provider(redirect_uri))
+        require_present(settings)
+        security = { strict_audience_validation: true, want_name_id: true }
+
+        OneLogin::RubySaml::Settings.new(settings.merge(name_identifier_format:, security:), true)
+      end
+
+      def identity_provider
+        { idp_sso_service_url:, idp_cert:, idp_entity_id: }
+      end
+
+      def service_provider(redirect_uri = nil)
+        callback = assertion_consumer_service_url || redirect_uri
+
+        { sp_entity_id:, assertion_consumer_service_url: callback }
+      end
+
+      def require_present(settings)
+        missing = settings.select { |_name, value| value.blank? }.keys
+        raise ArgumentError, "#{provider} needs #{missing.to_sentence}" if missing.any?
       end
 
       def info_from(response)

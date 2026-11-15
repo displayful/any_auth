@@ -9,6 +9,7 @@ module AnyAuth
       IDP_SSO_URL = 'https://idp.acme.test/sso'
       IDP_ENTITY_ID = 'https://idp.acme.test'
       SP_ENTITY_ID = 'https://tavle.test/saml'
+      EMAIL_FORMAT = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'
 
       test 'leaving sends the person to the IdP with a request' do
         request = saml.request_phase(redirect_uri: CALLBACK_URL)
@@ -17,11 +18,11 @@ module AnyAuth
         assert_predicate request.session['request_id'], :present?
       end
 
-      test 'a signed response names the person by NameID, with the email it carries' do
+      test 'a signed response names the person by IdP and NameID, with the email it carries' do
         auth = saml.callback_phase({ 'SAMLResponse' => signed_response }, {})
 
         assert_equal 'saml', auth.provider
-        assert_equal 'mette@acme.test', auth.uid
+        assert_equal 'https://idp.acme.test:mette@acme.test', auth.uid
         assert_equal 'mette@acme.test', auth.info.email
         assert_equal 'Mette Holm', auth.info.name
         assert_not auth.info.email_verified
@@ -50,6 +51,28 @@ module AnyAuth
         end
       end
 
+      test 'a response naming no audience, or no person, is refused' do
+        nobody_in_particular = signed_response(audience: nil)
+        nobody = signed_response(name_id: nil)
+
+        assert_raises(Unauthorized) do
+          saml.callback_phase({ 'SAMLResponse' => nobody_in_particular }, {})
+        end
+        assert_raises(Unauthorized) { saml.callback_phase({ 'SAMLResponse' => nobody }, {}) }
+      end
+
+      test 'a strategy missing a setting it checks against is an error, not a sign-in' do
+        incomplete = Saml.new(idp_sso_service_url: IDP_SSO_URL, idp_cert: CERTIFICATE.to_pem,
+          assertion_consumer_service_url: CALLBACK_URL)
+
+        error = assert_raises(ArgumentError) do
+          incomplete.callback_phase({ 'SAMLResponse' => signed_response }, {})
+        end
+
+        assert_includes error.message, 'idp_entity_id'
+        assert_includes error.message, 'sp_entity_id'
+      end
+
       test 'an expired response, or one for another service, is refused' do
         expired = signed_response(not_on_or_after: 1.minute.ago)
         elsewhere = signed_response(audience: 'https://elsewhere.test')
@@ -68,9 +91,12 @@ module AnyAuth
         assert_raises(InvalidCallback) { saml.callback_phase({}, {}) }
       end
 
-      test 'the metadata names where the IdP sends people back' do
-        assert_includes saml.metadata, CALLBACK_URL
-        assert_includes saml.metadata, SP_ENTITY_ID
+      test 'the metadata names where the IdP sends people back, before the IdP is set up' do
+        before_the_idp = Saml.new(sp_entity_id: SP_ENTITY_ID,
+          assertion_consumer_service_url: CALLBACK_URL)
+
+        assert_includes before_the_idp.metadata, CALLBACK_URL
+        assert_includes before_the_idp.metadata, SP_ENTITY_ID
       end
 
       private
@@ -97,9 +123,10 @@ module AnyAuth
         )
       end
 
-      def signed_response(key: KEY, audience: SP_ENTITY_ID, not_on_or_after: 5.minutes.from_now,
-                          in_response_to: nil)
-        xml = response_xml(audience:, not_on_or_after: not_on_or_after.utc.iso8601, in_response_to:)
+      def signed_response(key: KEY, audience: SP_ENTITY_ID, name_id: 'mette@acme.test',
+                          not_on_or_after: 5.minutes.from_now, in_response_to: nil)
+        xml = response_xml(audience:, name_id:, not_on_or_after: not_on_or_after.utc.iso8601,
+          in_response_to:)
         document = XMLSecurity::Document.new(xml)
         document.sign_document(key, CERTIFICATE, XMLSecurity::Document::RSA_SHA256,
           XMLSecurity::Document::SHA256)
@@ -107,12 +134,14 @@ module AnyAuth
         Base64.strict_encode64(document.to_s)
       end
 
-      def response_xml(audience:, not_on_or_after:, in_response_to:)
+      def response_xml(audience:, not_on_or_after:, in_response_to:, name_id: 'mette@acme.test')
         now = Time.now.utc.iso8601
         replying = %( InResponseTo="#{in_response_to}") if in_response_to
+        naming = %(<saml:NameID Format="#{EMAIL_FORMAT}">#{name_id}</saml:NameID>) if name_id
+        audience = "<saml:Audience>#{audience}</saml:Audience>" if audience
+        restriction = "<saml:AudienceRestriction>#{audience}</saml:AudienceRestriction>" if audience
         protocol = 'urn:oasis:names:tc:SAML:2.0:protocol'
         assertion = 'urn:oasis:names:tc:SAML:2.0:assertion'
-        email_format = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'
         password = 'urn:oasis:names:tc:SAML:2.0:ac:classes:Password'
 
         <<~XML.squish
@@ -125,7 +154,7 @@ module AnyAuth
             <saml:Assertion ID="_a1" Version="2.0" IssueInstant="#{now}">
               <saml:Issuer>#{IDP_ENTITY_ID}</saml:Issuer>
               <saml:Subject>
-                <saml:NameID Format="#{email_format}">mette@acme.test</saml:NameID>
+                #{naming}
                 <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
                   <saml:SubjectConfirmationData NotOnOrAfter="#{not_on_or_after}"
                     Recipient="#{CALLBACK_URL}"#{replying}/>
@@ -133,9 +162,7 @@ module AnyAuth
               </saml:Subject>
               <saml:Conditions NotBefore="#{1.minute.ago.utc.iso8601}"
                 NotOnOrAfter="#{not_on_or_after}">
-                <saml:AudienceRestriction>
-                  <saml:Audience>#{audience}</saml:Audience>
-                </saml:AudienceRestriction>
+                #{restriction}
               </saml:Conditions>
               <saml:AuthnStatement AuthnInstant="#{now}" SessionIndex="_s1">
                 <saml:AuthnContext>

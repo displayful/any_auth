@@ -29,7 +29,7 @@ back, and what is unusual about it.
 | [SAML](strategies/saml.md) | SAML 2.0, with ruby-saml | signing in through a customer's IdP |
 | [Developer](strategies/developer.md) | a field and a trip to yourself | signing in locally, with no vendor |
 
-## The three kinds
+## The kinds
 
 - **OAuth 2** strategies send the person to the vendor and come back with
   credentials. `auth.uid` is who signed in; which account that opened is in
@@ -38,6 +38,11 @@ back, and what is unusual about it.
 - **OpenID Connect** strategies are OAuth 2 plus an answer to who signed in.
   They always ask for `openid`, send a nonce and (except to Apple) a PKCE challenge, and read
   `auth.uid` and `auth.info` from the ID token.
+- **OAuth 1** strategies (`OAuth1`, loaded on request, with the `oauth` gem)
+  fetch a request token before sending the person away, and come back with a
+  token and its secret, which do not expire. No vendor of ours uses it; see
+  [Adding a strategy](adding-a-strategy.md#an-oauth-1-vendor).
+- **SAML** signs people in through a customer's IdP; see [its page](strategies/saml.md).
 - **Fields-only** strategies (e-conomic, Adversus) have no round trip. The person types what the
   vendor gave them, and `strategy.attributes` is what you store.
 

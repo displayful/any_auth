@@ -37,6 +37,14 @@ module AnyAuth
       def secure_compare(expected, given)
         expected.present? && ActiveSupport::SecurityUtils.secure_compare(expected.to_s, given.to_s)
       end
+
+      def error_class_for(status)
+        case status
+        when nil, 400, 401, 403 then Unauthorized
+        when 429 then RateLimited
+        else Unavailable
+        end
+      end
     end
   end
 end

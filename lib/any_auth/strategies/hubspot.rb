@@ -2,7 +2,7 @@
 
 module AnyAuth
   module Strategies
-    class Hubspot < OAuth
+    class Hubspot < OAuth2
       def client_options
         {
           site: 'https://api.hubapi.com',

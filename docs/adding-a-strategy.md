@@ -6,8 +6,9 @@ what differs, and test it against canned HTTP answers.
 
 | The vendor | Inherit from | You write |
 | --- | --- | --- |
-| hands back tokens, and you ask its API who signed in | `OAuth` | `client_options`, `identity` |
+| hands back tokens, and you ask its API who signed in | `OAuth2` | `client_options`, `identity` |
 | hands back an ID token (OpenID Connect) | `OpenIDConnect` | `client_options`, `valid_issuer?` |
+| speaks OAuth 1.0a | `OAuth1` | `client_options`, `identity` |
 | gives the person keys to paste, no sign-in | `Base` | attributes and validations |
 
 Read [How a sign-in works](how-a-sign-in-works.md) first if you want to know
@@ -20,7 +21,7 @@ The endpoints, and one request to learn who signed in:
 ```ruby
 module AnyAuth
   module Strategies
-    class Pipedrive < OAuth
+    class Pipedrive < OAuth2
       def client_options
         {
           site: "https://api.pipedrive.com",
@@ -99,6 +100,46 @@ vendor vouches for an address, or `identity_from(claims)` for another `uid`, as
 Microsoft does with `tid` and `oid`. Use `fetch_claim(claims, name)` for a
 claim that must be there.
 
+## An OAuth 1 vendor
+
+`OAuth1` is loaded on request and needs the [oauth](https://gitlab.com/ruby-oauth/oauth)
+gem in your bundle; without it, requiring it raises `LoadError`.
+
+```ruby
+require "any_auth/strategies/oauth1"
+
+class Twitter < AnyAuth::Strategies::OAuth1
+  def client_options
+    {
+      site: "https://api.twitter.com",
+      request_token_path: "/oauth/request_token",
+      authorize_path: "/oauth/authenticate",
+      access_token_path: "/oauth/access_token",
+    }
+  end
+
+  private
+
+  def identity(access_token, _session)
+    user = get(access_token, "/1.1/account/verify_credentials.json")
+
+    { uid: user["id_str"], info: AnyAuth::Info.new(name: user["name"]), raw: user }
+  end
+end
+
+config.provider :twitter, strategy: Twitter, consumer_key: "…", consumer_secret: "…"
+```
+
+- `client_options` go to the oauth gem's `OAuth::Consumer`, with its names.
+- The key and secret are `consumer_key` and `consumer_secret`, OAuth 1's names.
+- Leaving asks the vendor for a request token, so `redirect_to_provider` makes
+  an HTTP request; a vendor that is down raises `Unavailable` there.
+- The callback must carry the request token we were given (OAuth 1's state),
+  and `denied` with it is `Declined`.
+- `auth.credentials` is `{ "token", "secret" }`, as in OmniAuth. They do not
+  expire, so `refresh` returns them unchanged.
+- The oauth gem talks HTTP through `Net::HTTP`, which WebMock stubs as usual.
+
 ## A vendor with fields
 
 Anything the person must type first is an ActiveModel attribute, validated
@@ -127,15 +168,15 @@ authorize_option :prompt, :login_hint
 
 They become accessors, can be configured or passed to `AnyAuth.strategy`, and
 are added to the authorize URL when present. `scope` is declared for every
-OAuth strategy.
+OAuth 2 strategy.
 
 ## Switches
 
 | | Default | Change it |
 | --- | --- | --- |
-| PKCE (S256) | off for `OAuth`, on for `OpenIDConnect` | `self.pkce = true` or `false` in the class; `pkce: true` per provider |
+| PKCE (S256) | off for `OAuth2`, on for `OpenIDConnect` | `self.pkce = true` or `false` in the class; `pkce: true` per provider |
 | how the client authenticates | id and secret in the request body | `auth_scheme: :basic_auth` in `client_options` |
-| the default scope | none for `OAuth`, `email profile` for `OpenIDConnect` | a `scope:` default in an overridden `request_phase`, as Apple does |
+| the default scope | none for `OAuth2`, `email profile` for `OpenIDConnect` | a `scope:` default in an overridden `request_phase`, as Apple does |
 
 Turn PKCE on when the vendor's metadata lists `S256` under
 `code_challenge_methods_supported`, as Relatel's does.
@@ -149,7 +190,7 @@ applies.
 | --- | --- | --- |
 | `verify(params, session)` | a sign-in is under way, the state matches, no `error=`, a code is present | a signed callback (Shopify's HMAC) |
 | `fetch_access_token(code, session, **params)` | swaps the code, with the PKCE verifier | extra parameters on the swap (Shopify's `expiring: 1`) |
-| `identity(access_token, session)` | nothing for `OAuth`; reads the ID token for `OpenIDConnect` | saying who signed in |
+| `identity(access_token, session)` | nothing for `OAuth2`; reads the ID token for `OpenIDConnect` | saying who signed in |
 | `request_phase` / `callback_phase` | the whole flow | a vendor that differs throughout (Apple adds `response_mode`, `Developer` never leaves) |
 
 Raise AnyAuth's errors, not your own: `InvalidCallback` when the callback is
@@ -191,7 +232,7 @@ strategy this way.
 ## Checklist
 
 - `client_options` with the vendor's endpoints.
-- `identity` (OAuth) or `valid_issuer?` (OpenID Connect).
+- `identity` (OAuth 2) or `valid_issuer?` (OpenID Connect).
 - Fields validated, and checked again before they pick a host.
 - PKCE on if the vendor supports it.
 - Tests for who signed in, and for a refusal.

@@ -47,7 +47,7 @@ session[:any_auth] = {
 used once; ignores it if it has expired or is for another provider; puts the
 fields back on the strategy; and calls `callback_phase` with the request's
 query string and POST body (path parameters stay out). With nothing kept, the
-strategy decides: OAuth and the developer strategy refuse the callback, SAML
+strategy decides: OAuth 2 and the developer strategy refuse the callback, SAML
 accepts it on its signature. `any_auth_params` reads `params` without taking
 the entry.
 
@@ -85,6 +85,14 @@ The ID token's signature is not verified. It is read straight from the token
 endpoint over TLS, in answer to a request authenticated with the client
 secret, which [OpenID Connect Core 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation)
 allows. A token from anywhere else must be verified.
+
+## OAuth 1
+
+`OAuth1` asks the vendor for a request token while leaving, keeps the token
+and its secret (`request_token`, `request_token_secret`) instead of a state,
+and on the way back checks, in order: a sign-in is under way; `denied` naming
+our token is `Declined`; `oauth_token` is our token, in constant time; an
+`oauth_verifier` is present. Then it swaps the verifier for an access token.
 
 ## Errors from the vendor
 

@@ -371,6 +371,7 @@ unconfigured provider is a `KeyError`.
 | [`Shopify`](docs/strategies/shopify.md) | OAuth 2 with a field | per-shop endpoints, signed callback |
 | [`Economic`](docs/strategies/economic.md), [`Adversus`](docs/strategies/adversus.md) | fields only | |
 | [`Saml`](docs/strategies/saml.md) | SAML 2.0 | a customer's IdP; needs ruby-saml, loaded on request |
+| [`OAuth1`](docs/adding-a-strategy.md#an-oauth-1-vendor) | OAuth 1.0a | a base for OAuth 1 vendors; needs the oauth gem, loaded on request |
 | [`Developer`](docs/strategies/developer.md) | a field | sign in as anyone; development only, loaded on request |
 
 ## Writing a strategy
@@ -378,7 +379,7 @@ unconfigured provider is a `KeyError`.
 A new OAuth 2 vendor is its endpoints and one request to learn who signed in:
 
 ```ruby
-class Pipedrive < AnyAuth::Strategies::OAuth
+class Pipedrive < AnyAuth::Strategies::OAuth2
   def client_options
     { site: "https://api.pipedrive.com", authorize_url: "https://oauth.pipedrive.com/oauth/authorize",
       token_url: "https://oauth.pipedrive.com/oauth/token" }
@@ -443,7 +444,6 @@ Outside a controller, call `request_phase` and `callback_phase` yourself; see
 
 ## Limits
 
-- No OAuth 1.
 - A callback that arrives as a cross-site `POST` loses the session cookie.
   Apple's is sent on to a `GET` ([its page](docs/strategies/apple.md)); SAML's
   is accepted on its signature alone ([its page](docs/strategies/saml.md#the-trade-off)).

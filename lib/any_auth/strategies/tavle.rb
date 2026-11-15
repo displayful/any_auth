@@ -2,7 +2,7 @@
 
 module AnyAuth
   module Strategies
-    class Tavle < OAuth
+    class Tavle < OAuth2
       self.pkce = true
 
       def client_options

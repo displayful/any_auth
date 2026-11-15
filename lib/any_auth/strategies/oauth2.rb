@@ -2,7 +2,7 @@
 
 module AnyAuth
   module Strategies
-    class OAuth < Base
+    class OAuth2 < Base
       class_attribute :authorize_options, default: [], instance_writer: false
       class_attribute :pkce, default: false
 
@@ -52,7 +52,7 @@ module AnyAuth
 
       def refresh!(credentials)
         access_token = with_error_handling do
-          OAuth2::AccessToken.from_hash(client, credentials).refresh
+          ::OAuth2::AccessToken.from_hash(client, credentials).refresh
         end
 
         credentials.except('expires_at').merge(credentials_from(access_token))
@@ -99,7 +99,7 @@ module AnyAuth
       end
 
       def client
-        OAuth2::Client.new(client_id, client_secret, **default_client_options, **client_options)
+        ::OAuth2::Client.new(client_id, client_secret, **default_client_options, **client_options)
       end
 
       def default_client_options
@@ -115,7 +115,7 @@ module AnyAuth
 
       def with_error_handling
         yield
-      rescue OAuth2::Error => e
+      rescue ::OAuth2::Error => e
         raise vendor_error(e), cause: nil
       rescue Faraday::Error, JSON::ParserError => e
         raise Unavailable, "#{provider} request failed (#{e.class.name.demodulize})", cause: nil
@@ -126,14 +126,6 @@ module AnyAuth
         message = "#{provider} returned #{error.code || status || 'no token'}"
 
         error_class_for(status).new(message, code: error.code)
-      end
-
-      def error_class_for(status)
-        case status
-        when nil, 400, 401, 403 then Unauthorized
-        when 429 then RateLimited
-        else Unavailable
-        end
       end
     end
   end

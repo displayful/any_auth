@@ -4,7 +4,7 @@ require 'test_helper'
 
 module AnyAuth
   module Strategies
-    class OAuthTest < ActiveSupport::TestCase
+    class OAuth2Test < ActiveSupport::TestCase
       TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token'
 
       setup do

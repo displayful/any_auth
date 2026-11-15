@@ -24,7 +24,8 @@ AnyAuth.configure do |config|
 end
 ```
 
-The strategy is not loaded by default. Loading it without ruby-saml, or with a
+The strategy is not loaded by default, and ruby-saml is not a dependency of
+AnyAuth. Loading the strategy without ruby-saml in your bundle, or with a
 version before 1.18.1 (which have published signature bypasses), raises a
 `LoadError` saying so. Keep ruby-saml up to date: its security is the
 strategy's.
@@ -51,8 +52,12 @@ AnyAuth.strategy(:saml,
 | `assertion_consumer_service_url` | your callback; the response must be addressed to it |
 | `name_identifier_format` | the NameID format to ask for, such as `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` |
 
-Set `assertion_consumer_service_url` when building the strategy for the
-callback too: the session is usually gone there (see below).
+The first five are required: a strategy missing any of them raises
+`ArgumentError` naming it, because ruby-saml quietly skips the check a missing
+setting would make. Set `assertion_consumer_service_url` when building the
+strategy for the callback too: the session is usually gone there (see below).
+`metadata` needs only `sp_entity_id` and `assertion_consumer_service_url`, so
+you can hand it to a customer before their IdP is set up.
 
 ## At the IdP
 
@@ -90,12 +95,17 @@ end
 
 | | |
 | --- | --- |
-| `auth.uid` | the NameID |
+| `auth.uid` | `<idp_entity_id>:<NameID>` |
 | `auth.info.email` | the `email` attribute, or `mail` |
 | `auth.info.name` | the `name` attribute |
 | `auth.info.email_verified` | always false: the customer runs the IdP and decides what it asserts |
 | `auth.credentials` | empty |
 | `auth.raw` | every attribute, each a list of values |
+
+`uid` names the IdP as well as the person. Every customer's IdP is configured
+under the same provider, and a customer controls what their IdP asserts, so a
+bare NameID such as `mette@acme.test` could be claimed by another customer's
+IdP. Keyed on `provider` and `uid`, each customer's people stay their own.
 
 Linking a SAML sign-in to an existing account by email is your decision, per
 customer: trust only an IdP whose domain the customer has proven they own.
@@ -104,8 +114,10 @@ customer: trust only an IdP whose domain the customer has proven they own.
 
 ruby-saml checks the signature against `idp_cert`, the issuer, the audience,
 the destination and recipient, and the timestamps (with five seconds of
-clock drift). An invalid response is an `AnyAuth::Unauthorized`; a callback
-without one is an `AnyAuth::InvalidCallback`.
+clock drift). Two of its checks are stricter than its defaults: the response
+must name your entity ID as its audience, and must name a person (a NameID).
+An invalid response is an `AnyAuth::Unauthorized`; a callback without one is
+an `AnyAuth::InvalidCallback`.
 
 ## The trade-off
 

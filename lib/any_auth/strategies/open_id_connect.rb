@@ -2,7 +2,7 @@
 
 module AnyAuth
   module Strategies
-    class OpenIDConnect < OAuth
+    class OpenIDConnect < OAuth2
       self.pkce = true
 
       def request_phase(redirect_uri:, scope: self.scope || 'email profile', **params)

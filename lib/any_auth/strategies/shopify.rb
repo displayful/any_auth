@@ -2,7 +2,7 @@
 
 module AnyAuth
   module Strategies
-    class Shopify < OAuth
+    class Shopify < OAuth2
       attribute :shop, :string
 
       validates :shop, format: { with: /\A[a-z0-9][a-z0-9-]*\.myshopify\.com\z/, message: :invalid }
