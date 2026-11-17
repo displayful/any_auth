@@ -20,10 +20,6 @@ module AnyAuth
         @provider || self.class.provider
       end
 
-      def expired?(_credentials)
-        false
-      end
-
       def refresh(credentials)
         credentials
       end

@@ -123,10 +123,13 @@ it would carry both.
 
 ## Refreshing
 
-`refresh(credentials)` asks the vendor only when the stored `expires_at` is
-less than two minutes away, and merges what comes back over what was stored:
-a vendor that sends no new refresh token keeps the old one, and an
-`expires_at` the vendor no longer sends is dropped.
+`refresh(credentials)` asks the vendor for a new access token every time it is
+called; when to call it is the app's to decide, from `expires_at` and
+`refresh_token_expires_at`, both epoch seconds. What comes back is merged over
+what was stored: a vendor that sends no new refresh token keeps the old one,
+and so does a `refresh_token_expires_at` or `scope` it does not send again,
+while an `expires_at` the vendor no longer sends is dropped. An `expires_at`
+that 0.1.0 stored as ISO 8601 text still refreshes.
 
 ## Without the helpers
 
