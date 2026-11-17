@@ -9,9 +9,13 @@ Gem::Specification.new do |spec|
   spec.authors = ['Displayful']
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.4'
-  spec.files = Dir['lib/**/*.rb', 'README.md']
+  spec.homepage = 'https://github.com/displayful/any_auth'
+  spec.files = Dir['lib/**/*.rb', 'README.md', 'CHANGELOG.md', 'LICENSE']
   spec.metadata = {
-    'allowed_push_host' => 'https://rubygems.pkg.github.com/displayful',
+    'source_code_uri' => spec.homepage,
+    'changelog_uri' => "#{spec.homepage}/blob/main/CHANGELOG.md",
+    'documentation_uri' => "#{spec.homepage}/tree/main/docs",
+    'bug_tracker_uri' => "#{spec.homepage}/issues",
     'rubygems_mfa_required' => 'true',
   }
 

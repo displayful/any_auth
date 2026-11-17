@@ -21,7 +21,7 @@ Needs Ruby 3.4 and Rails 8.
 
 ```ruby
 # Gemfile
-gem "any_auth", github: "displayful/any_auth"
+gem "any_auth"
 ```
 
 ### 2. Register the providers
