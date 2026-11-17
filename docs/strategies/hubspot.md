@@ -24,7 +24,7 @@ redirect URL, and tick the same scopes you ask for.
 | --- | --- |
 | `auth.uid` | the id of the user who signed in (`user_id`), as a string |
 | `auth.info.email` | their address (`user`). HubSpot does not vouch for it, so `email_verified` is false |
-| `auth.credentials` | `access_token`, `refresh_token`, `expires_at` |
+| `auth.credentials` | `access_token`, `refresh_token`, `expires_at`, and `scope` from HubSpot's `scopes` list |
 | `auth.raw` | HubSpot's answer about the token: `user_id`, `user`, `hub_id`, `hub_domain`, `scopes`, `app_id` |
 
 The portal they opened is `auth.raw["hub_id"]`, with its domain in

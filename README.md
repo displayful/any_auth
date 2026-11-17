@@ -257,7 +257,7 @@ else. `Economic` and `Adversus` have fields and no sign-in at all: check
 
 ### Store and refresh the credentials
 
-Store `auth.credentials` (encrypted), and renew it before each use:
+Store `auth.credentials` (encrypted), and renew it when it is about to run out:
 
 ```ruby
 class Shop < ApplicationRecord
@@ -265,20 +265,35 @@ class Shop < ApplicationRecord
   encrypts :credentials
 
   def access_token
-    renewed = strategy.refresh(credentials)
-    update!(credentials: renewed) if renewed != credentials
-    renewed["access_token"]
+    renew if expiring?
+    credentials["access_token"]
   end
 
   private
+    def expiring?
+      expires_at = credentials["expires_at"]
+      expires_at.present? && expires_at < 2.minutes.from_now.to_i
+    end
+
+    def renew
+      update!(credentials: strategy.refresh(credentials))
+    end
+
     def strategy
       AnyAuth.strategy(:shopify, shop: credentials["shop"])
     end
 end
 ```
 
-`refresh` asks the vendor only when the token runs out within two minutes, and
-keeps a refresh token the vendor did not replace. A vendor that rotates its
+`refresh` always asks the vendor, and keeps a refresh token the vendor did not
+replace; a strategy with nothing to refresh, such as OAuth 1, answers the
+credentials as they are. When to refresh is yours to decide. Renew a little before
+`expires_at`, since a token used to its last second can run out mid-request.
+`refresh_token_expires_at` says when the refresh token itself runs out, for a
+keep-alive that renews idle credentials in time, but most vendors don't say,
+so its absence does not mean it never runs out. Both are epoch seconds;
+credentials stored by 0.1.0 hold `expires_at` as ISO 8601 text until their
+next refresh. A vendor that rotates its
 refresh token, as Shopify does, must not be refreshed twice at once. How a
 vendor wants the token sent on an API call is on its
 [strategy page](docs/strategies).
@@ -355,7 +370,7 @@ next person at the browser cannot finish it.
 | `auth.provider` | the name the provider is configured under |
 | `auth.uid` | who the vendor's token is for, as the vendor identifies them |
 | `auth.info` | `name`, `email`, `image`, nil where the vendor does not say; `email_verified`, false unless it vouches |
-| `auth.credentials` | `access_token`, and `refresh_token` and `expires_at` (ISO 8601) when sent |
+| `auth.credentials` | `access_token`, and when sent `token_type`, `refresh_token`, `expires_at`, `refresh_token_expires_at` (epoch seconds) and `scope` |
 | `auth.raw` | what the vendor said about who signed in: the ID token's claims, or its answer without the tokens |
 | `auth.params` | what you passed as `params:` |
 
@@ -479,7 +494,7 @@ checked along the way.
 - Keep your provider names: `config.provider :google_oauth2, strategy: :google`.
 - Compare `uid`s before switching; each strategy page says what it is.
 - `auth` is an object: `auth.uid`, not `auth["uid"]`. `credentials` has
-  `access_token` where OmniAuth has `token`, and `expires_at` as ISO 8601 text.
+  `access_token` where OmniAuth has `token`, and no `expires` flag.
 
 ## Testing
 

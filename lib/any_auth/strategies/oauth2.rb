@@ -40,19 +40,7 @@ module AnyAuth
         Auth.new(provider:, credentials:, **identity(access_token, session))
       end
 
-      def expired?(credentials)
-        expires_at = credentials['expires_at']&.to_time
-
-        expires_at.present? && expires_at.before?(2.minutes.from_now)
-      end
-
       def refresh(credentials)
-        return credentials unless expired?(credentials)
-
-        refresh!(credentials)
-      end
-
-      def refresh!(credentials)
         access_token = with_error_handling do
           ::OAuth2::AccessToken.from_hash(client, credentials).refresh
         end
@@ -93,10 +81,19 @@ module AnyAuth
       def credentials_from(access_token)
         raise AccessDenied, "#{provider} returned no access token" if access_token.token.blank?
 
+        params = access_token.params
+        # The refresh token's lifetime: the IETF draft calls it refresh_token_timeout; GitHub,
+        # Google and Shopify say refresh_token_expires_in.
+        lifetime = params['refresh_token_timeout'] || params['refresh_token_expires_in']
+        refresh_token_expires_at = Time.now.to_i + lifetime.to_i if lifetime
+
         {
           'access_token' => access_token.token,
+          'token_type' => params['token_type'],
           'refresh_token' => access_token.refresh_token,
-          'expires_at' => (Time.at(access_token.expires_at).utc.iso8601 if access_token.expires_at),
+          'expires_at' => access_token.expires_at,
+          'refresh_token_expires_at' => refresh_token_expires_at,
+          'scope' => params['scope'],
         }.compact
       end
 

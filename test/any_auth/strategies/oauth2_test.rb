@@ -88,7 +88,7 @@ module AnyAuth
       test 'a vendor that throttles us is Unavailable, and says when to try again' do
         stub_request(:post, TOKEN_URL).to_return(status: 429, headers: { 'Retry-After' => '30' })
 
-        throttled = assert_raises(Unavailable) { hubspot.refresh!('refresh_token' => 'refresh') }
+        throttled = assert_raises(Unavailable) { hubspot.refresh('refresh_token' => 'refresh') }
 
         assert_equal 30, throttled.retry_after
       end
@@ -97,7 +97,7 @@ module AnyAuth
         later = 2.minutes.from_now.httpdate
         stub_request(:post, TOKEN_URL).to_return(status: 503, headers: { 'Retry-After' => later })
 
-        throttled = assert_raises(Unavailable) { hubspot.refresh!('refresh_token' => 'refresh') }
+        throttled = assert_raises(Unavailable) { hubspot.refresh('refresh_token' => 'refresh') }
 
         assert_in_delta 120, throttled.retry_after, 2
       end
@@ -131,7 +131,7 @@ module AnyAuth
       end
 
       test 'a refusal from the oauth2 gem itself carries no vendor code' do
-        refused = assert_raises(AccessDenied) { hubspot.refresh!({}) }
+        refused = assert_raises(AccessDenied) { hubspot.refresh({}) }
 
         assert_nil refused.code
       end

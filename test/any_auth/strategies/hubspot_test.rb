@@ -25,6 +25,13 @@ module AnyAuth
         assert_nil auth.raw['token']
       end
 
+      test 'the scopes HubSpot sends as a list are credentials scope' do
+        stub_json(:post, TOKEN_URL, access_token: 'new', scopes: %w[oauth crm.objects.deals.read])
+        stub_json(:post, INTROSPECT_URL, active: true, user_id: 41)
+
+        assert_equal 'oauth crm.objects.deals.read', come_home.credentials['scope']
+      end
+
       test 'leaving sends a PKCE challenge, and the swap sends its verifier' do
         hubspot = Hubspot.new(client_id: 'app', client_secret: 'secret')
         request = hubspot.request_phase(redirect_uri: CALLBACK_URL)

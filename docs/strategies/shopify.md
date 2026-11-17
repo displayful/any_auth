@@ -47,8 +47,7 @@ URL, and list the scopes you ask for.
 
 Shopify replaces the refresh token every time it is used. Two processes
 refreshing at once will leave one of them with a dead token, so check
-`strategy.expired?(credentials)`, take a lock or reload, and only then call
-`refresh`.
+`expires_at`, take a lock or reload, and only then call `refresh`.
 
 Send the access token to the Admin API as `X-Shopify-Access-Token: …`, not as
 a bearer token.

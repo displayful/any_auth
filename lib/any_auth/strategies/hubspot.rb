@@ -13,6 +13,11 @@ module AnyAuth
 
       private
 
+      # HubSpot sends the granted scopes as an array named `scopes`.
+      def credentials_from(access_token)
+        super.merge('scope' => access_token.params['scopes']&.join(' ')).compact
+      end
+
       def identity(access_token, _session)
         token_info = introspect(access_token.token)
         raise AccessDenied, "#{provider} returned no user" unless named_user?(token_info)
