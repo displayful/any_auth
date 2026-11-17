@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - `credentials` also carries `token_type`, `scope` and, when the vendor says,
   `refresh_token_expires_at`, read from `refresh_token_timeout` (the IETF draft)
