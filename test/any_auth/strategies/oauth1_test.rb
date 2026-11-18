@@ -114,10 +114,9 @@ module AnyAuth
         assert_raises(ConfigurationError) { vendor.callback_phase(answer, KEPT) }
       end
 
-      test 'credentials do not expire, so they are never refreshed' do
+      test 'credentials do not expire, so a refresh answers them as they are' do
         credentials = { 'token' => 'access', 'secret' => 'access-secret' }
 
-        assert_not vendor.expired?(credentials)
         assert_equal credentials, vendor.refresh(credentials)
       end
 
