@@ -286,14 +286,16 @@ end
 ```
 
 `refresh` always asks the vendor, and keeps a refresh token the vendor did not
-replace. When to refresh is yours to decide. Renew a little before
-`expires_at`, since a token used to its last second can run out mid-request.
-`refresh_token_expires_at` says when the refresh token itself runs out, for a
-keep-alive that renews idle credentials in time, but most vendors don't say,
-so its absence does not mean it never runs out. A vendor that rotates its
-refresh token, as Shopify does, must not be refreshed twice at once. How a
-vendor wants the token sent on an API call is on its
-[strategy page](docs/strategies).
+replace; a strategy with nothing to refresh, such as OAuth 1, answers the
+credentials as they are. When to refresh is yours to decide. Renew a little
+before `expires_at`, since a token used to its last second can run out
+mid-request. `refresh_token_expires_at` says when the refresh token itself runs
+out, for a keep-alive that renews idle credentials in time, but most vendors
+don't say, so its absence does not mean it never runs out. Both are epoch
+seconds; credentials stored by 0.1.0 hold `expires_at` as ISO 8601 text until
+their next refresh. A vendor that rotates its refresh token, as Shopify does,
+must not be refreshed twice at once. How a vendor wants the token sent on an
+API call is on its [strategy page](docs/strategies).
 
 ### Configuring each sign-in (OmniAuth's setup phase)
 

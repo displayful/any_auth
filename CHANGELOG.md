@@ -2,15 +2,11 @@
 
 ## 0.2.0
 
-- `credentials` also carries `token_type`, `scope` and, when the vendor says,
-  `refresh_token_expires_at`, read from `refresh_token_timeout` (the IETF draft)
-  or `refresh_token_expires_in` (GitHub, Google, Shopify). HubSpot's `scopes`
-  list becomes `scope`.
-- `expires_at` and `refresh_token_expires_at` are epoch seconds, as oauth2 and
-  OmniAuth keep them, instead of ISO 8601 text. Credentials stored by 0.1.0
-  still refresh.
-- `refresh(credentials)` always asks the vendor, and `refresh!` and `expired?`
-  are gone: when to refresh is the app's decision.
+- `credentials` adds `token_type`, `scope` and `refresh_token_expires_at`.
+- Expiry times are epoch seconds, not ISO 8601 text. Credentials saved by
+  0.1.0 keep a text `expires_at` until their next refresh.
+- `refresh` always asks the vendor, so check `expires_at` before calling it.
+  `expired?` and `refresh!` are gone.
 
 ## 0.1.0
 
