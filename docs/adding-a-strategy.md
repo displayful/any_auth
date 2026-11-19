@@ -49,6 +49,8 @@ end
 
 - `client_options` go to the [oauth2 gem](https://gitlab.com/ruby-oauth/oauth2)'s
   `OAuth2::Client`. A relative `authorize_url` or `token_url` is joined to `site`.
+  Requests give up after 5 seconds connecting and 10 answering; a
+  `connection_opts` of your own replaces that.
 - `get(access_token, path)` sends the token as a Bearer header, turns refusals
   and outages into AnyAuth errors, and refuses an answer that is not a JSON
   object. The hash it returns keeps the vendor's own keys.
@@ -133,6 +135,8 @@ config.provider :twitter, strategy: Twitter, consumer_key: "…", consumer_secre
 ```
 
 - `client_options` go to the oauth gem's `OAuth::Consumer`, with its names.
+  Requests give up after 5 seconds connecting and 10 answering; set
+  `open_timeout` or `timeout` to change that.
 - The key and secret are `consumer_key` and `consumer_secret`, OAuth 1's names.
 - Leaving asks the vendor for a request token, so `redirect_to_provider` makes
   an HTTP request; a vendor that is down raises `Unavailable` there.
