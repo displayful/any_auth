@@ -67,7 +67,12 @@ module AnyAuth
       end
 
       def consumer
-        ::OAuth::Consumer.new(consumer_key, consumer_secret, client_options)
+        ::OAuth::Consumer.new(consumer_key, consumer_secret, **default_client_options, **client_options)
+      end
+
+      # The oauth gem waits a minute by default; a sign-in shouldn't hang that long.
+      def default_client_options
+        { open_timeout: 5, timeout: 10 }
       end
 
       def get(access_token, path)

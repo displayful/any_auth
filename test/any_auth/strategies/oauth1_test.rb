@@ -120,6 +120,13 @@ module AnyAuth
         assert_equal credentials, vendor.refresh(credentials)
       end
 
+      test 'a vendor gets 5 seconds to connect and 10 to answer' do
+        http = vendor.send(:consumer).http
+
+        assert_equal 5, http.open_timeout
+        assert_equal 10, http.read_timeout
+      end
+
       private
 
       def vendor

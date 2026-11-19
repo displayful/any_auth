@@ -85,6 +85,13 @@ module AnyAuth
         assert_raises(Unavailable) { hubspot.callback_phase(callback_params, stored_session) }
       end
 
+      test 'a vendor gets 5 seconds to connect and 10 to answer' do
+        options = hubspot.send(:client).connection.options
+
+        assert_equal 5, options.open_timeout
+        assert_equal 10, options.timeout
+      end
+
       test 'a vendor that throttles us is Unavailable, and says when to try again' do
         stub_request(:post, TOKEN_URL).to_return(status: 429, headers: { 'Retry-After' => '30' })
 

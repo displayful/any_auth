@@ -101,8 +101,9 @@ module AnyAuth
         ::OAuth2::Client.new(client_id, client_secret, **default_client_options, **client_options)
       end
 
+      # Faraday waits a minute by default; a sign-in or refresh shouldn't hang that long.
       def default_client_options
-        { auth_scheme: :request_body }
+        { auth_scheme: :request_body, connection_opts: { request: { open_timeout: 5, timeout: 10 } } }
       end
 
       def get(access_token, path)
